@@ -10,8 +10,20 @@ import SwiftUI
 @main
 struct CarryOverApp: App {
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra("CarryOver", systemImage: "arrow.triangle.2.circlepath") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("CarryOver")
+                    .font(.headline)
+
+                Text("Menu bar app is working ✅")
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                Button("Quit") { NSApp.terminate(nil) }
+            }
+            .padding()
+            .frame(width: 320)
         }
     }
 }
