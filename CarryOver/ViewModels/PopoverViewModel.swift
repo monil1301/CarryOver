@@ -12,19 +12,18 @@ final class PopoverViewModel: ObservableObject {
     let store: DailyStore
     let openSettings: () -> Void
 
-    var selectedDate: Date = Date() { didSet { objectWillChange.send() } }
-    var newText: String = "" { didSet { objectWillChange.send() } }
-    var focusToken: Int = 0 { didSet { objectWillChange.send() } }
-    var selection: UUID? {
-        didSet {
-            guard selection != oldValue else { return }
-            DispatchQueue.main.async { [weak self] in
-                self?.objectWillChange.send()
-            }
+    var selectedDate: Date = Date() { didSet { sendChange() } }
+    var newText: String = "" { didSet { sendChange() } }
+    var focusToken: Int = 0 { didSet { sendChange() } }
+    var selection: UUID? { didSet { sendChange() } }
+    var focusListToken: Int = 0 { didSet { sendChange() } }
+    var showDatePicker: Bool = false { didSet { sendChange() } }
+
+    private func sendChange() {
+        DispatchQueue.main.async { [weak self] in
+            self?.objectWillChange.send()
         }
     }
-    var focusListToken: Int = 0 { didSet { objectWillChange.send() } }
-    var showDatePicker: Bool = false { didSet { objectWillChange.send() } }
 
     var selectedKey: String { store.dayKey(for: selectedDate) }
     var isToday: Bool { Calendar.current.isDateInToday(selectedDate) }
