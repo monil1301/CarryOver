@@ -12,12 +12,19 @@ final class PopoverViewModel: ObservableObject {
     let store: DailyStore
     let openSettings: () -> Void
 
-    @Published var selectedDate: Date = Date()
-    @Published var newText: String = ""
-    @Published var focusToken: Int = 0
-    @Published var selection: UUID?
-    @Published var focusListToken: Int = 0
-    @Published var showDatePicker: Bool = false
+    var selectedDate: Date = Date() { didSet { objectWillChange.send() } }
+    var newText: String = "" { didSet { objectWillChange.send() } }
+    var focusToken: Int = 0 { didSet { objectWillChange.send() } }
+    var selection: UUID? {
+        didSet {
+            guard selection != oldValue else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.objectWillChange.send()
+            }
+        }
+    }
+    var focusListToken: Int = 0 { didSet { objectWillChange.send() } }
+    var showDatePicker: Bool = false { didSet { objectWillChange.send() } }
 
     var selectedKey: String { store.dayKey(for: selectedDate) }
     var isToday: Bool { Calendar.current.isDateInToday(selectedDate) }
@@ -33,9 +40,16 @@ final class PopoverViewModel: ObservableObject {
     var undoneTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
 
+    private var storeCancellable: AnyCancellable?
+
     init(store: DailyStore, openSettings: @escaping () -> Void) {
         self.store = store
         self.openSettings = openSettings
+        storeCancellable = store.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
     }
 
     func addTask() {
