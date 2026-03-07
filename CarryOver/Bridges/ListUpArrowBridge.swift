@@ -44,8 +44,7 @@ struct ListUpArrowBridge: NSViewRepresentable {
                 guard let self else { return event }
                 guard self.shouldHandle?() == true else { return event }
 
-                // Up arrow = 126
-                guard event.keyCode == 126 else { return event }
+                guard event.keyCode == KeyCode.upArrow else { return event }
 
                 guard let window = self.hostView?.window, window.isKeyWindow else { return event }
                 guard let fr = window.firstResponder else { return event }
