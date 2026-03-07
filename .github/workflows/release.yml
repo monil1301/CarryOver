@@ -1,0 +1,52 @@
+name: Release (macOS app zip)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build (Release)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project CarryOver.xcodeproj \
+            -scheme CarryOver \
+            -configuration Release \
+            -destination "platform=macOS" \
+            -derivedDataPath build \
+            clean build
+
+      - name: Locate .app
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find build/Build/Products/Release -maxdepth 2 -name "CarryOver.app" -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "CarryOver.app not found!"
+            find build/Build/Products -maxdepth 4 -type d -name "*.app" -print
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+
+      - name: Zip app
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CarryOver.app.zip
+          shasum -a 256 CarryOver.app.zip > CarryOver.app.zip.sha256
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            CarryOver.app.zip
+            CarryOver.app.zip.sha256
+          generate_release_notes: true
