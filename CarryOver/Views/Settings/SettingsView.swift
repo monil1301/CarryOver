@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import HotKey
 
 struct SettingsView: View {
     let onChange: () -> Void

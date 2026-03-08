@@ -6,6 +6,7 @@
 import SwiftUI
 internal import Combine
 
+@MainActor
 final class PopoverViewModel: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
 
