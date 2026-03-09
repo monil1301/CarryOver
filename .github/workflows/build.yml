@@ -1,9 +1,10 @@
 name: Build (macOS)
 
 on:
-  pull_request:
-  push:
-    branches: [ main ]
+  # Disabled: requires Xcode 26 / macOS 26 which is not yet available on GitHub-hosted runners
+  # pull_request:
+  # push:
+  #   branches: [ main ]
   workflow_dispatch:
 
 jobs:

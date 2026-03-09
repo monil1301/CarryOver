@@ -34,8 +34,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath",
-                                   accessibilityDescription: "CarryOver")
+            let config = NSImage.SymbolConfiguration(pointSize: 17, weight: .regular)
+            let image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "CarryOver")?
+                .withSymbolConfiguration(config)
+
+            button.image = image
             button.target = self
             button.action = #selector(togglePopover(_:))
         }

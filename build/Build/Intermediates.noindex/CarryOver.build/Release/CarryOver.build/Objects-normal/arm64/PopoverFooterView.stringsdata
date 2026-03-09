@@ -1,0 +1,24 @@
+{
+  "source": "/Users/monilshah/Documents/Projects/macOS/CarryOver/CarryOver/Views/Popover/PopoverFooterView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Quit",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 17
+        }
+      }
+    ]
+  },
+  "version": 1
+}
