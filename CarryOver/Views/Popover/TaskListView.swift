@@ -46,5 +46,10 @@ struct TaskListView: View {
 
         ListFocusBridge(token: $viewModel.focusListToken)
             .frame(width: 0, height: 0)
+
+        ListReturnKeyBridge(onReturn: {
+            viewModel.toggleSelectedDone()
+        })
+        .frame(width: 0, height: 0)
     }
 }

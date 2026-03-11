@@ -68,6 +68,12 @@ final class PopoverViewModel: ObservableObject {
         store.toggleDone(dayKey: selectedKey, taskID: taskID)
     }
 
+    func toggleSelectedDone() -> Bool {
+        guard let id = selection else { return false }
+        toggleDone(taskID: id)
+        return true
+    }
+
     func deleteSelected() {
         guard let id = selection else { return }
         let tasksBefore = store.tasks(for: selectedKey)
