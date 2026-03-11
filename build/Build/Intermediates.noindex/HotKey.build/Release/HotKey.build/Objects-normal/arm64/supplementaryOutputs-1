@@ -1,0 +1,12 @@
+{
+  "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/SourcePackages/checkouts/HotKey/Sources/HotKey/HotKey.swift" : {
+    "abi-baseline-json" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey.abi.json",
+    "const-values" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey-primary.swiftconstvalues",
+    "dependencies" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey-primary.d",
+    "diagnostics" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey-primary.dia",
+    "objc-header" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey-Swift.h",
+    "swiftdoc" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey.swiftdoc",
+    "swiftmodule" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey.swiftmodule",
+    "swiftsourceinfo" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/HotKey.build/Release/HotKey.build/Objects-normal/arm64/HotKey.swiftsourceinfo"
+  }
+}

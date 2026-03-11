@@ -1,0 +1,64 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "b768792b4b1b29d88af2fe660f97e88bae474acd3d4bdf075aad38e552315e06"
+    }
+  ],
+  "containerPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/CarryOver.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "macosx",
+      "sdk" : "macosx26.0",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Products",
+      "derivedDataPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build",
+      "indexDataStoreFolderPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/monilshah/Documents/Projects/macOS/CarryOver/build/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Release",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "build",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES",
+          "ONLY_ACTIVE_ARCH" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

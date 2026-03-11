@@ -1,0 +1,104 @@
+{
+  "source": "/Users/monilshah/Documents/Projects/macOS/CarryOver/CarryOver/Views/Settings/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Navigation shortcuts",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hotkey",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 20
+        }
+      },
+      {
+        "comment": "",
+        "key": "Current:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 24
+        }
+      },
+      {
+        "comment": "",
+        "key": "Press a shortcut now…",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 33
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Must include at least one modifier (⌘ ⌥ ⌃ ⇧)\n• Esc to cancel\n• Delete to clear",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 36
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recording…",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Record Shortcut",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 77
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Today: ⌘T",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Previous day: ⌘[",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Next day: ⌘]",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 99
+        }
+      },
+      {
+        "comment": "",
+        "key": "• Pick date: ⌘P",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 100
+        }
+      }
+    ]
+  },
+  "version": 1
+}

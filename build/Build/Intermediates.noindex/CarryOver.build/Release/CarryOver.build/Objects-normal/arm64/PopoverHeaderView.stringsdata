@@ -1,0 +1,56 @@
+{
+  "source": "/Users/monilshah/Documents/Projects/macOS/CarryOver/CarryOver/Views/Popover/PopoverHeaderView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Today",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "Previous day",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "Next day",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pick a date",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 53
+        }
+      }
+    ]
+  },
+  "version": 1
+}
