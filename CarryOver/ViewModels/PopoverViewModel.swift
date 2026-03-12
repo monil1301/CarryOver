@@ -15,10 +15,22 @@ final class PopoverViewModel: ObservableObject {
 
     var selectedDate: Date = Date() { didSet { sendChange() } }
     var newText: String = "" { didSet { sendChange() } }
-    var focusToken: Int = 0 { didSet { sendChange() } }
-    var selection: UUID? { didSet { sendChange() } }
+    var focusToken: Int = 0 {
+        didSet {
+            if isEditing { cancelEdit() }
+            sendChange()
+        }
+    }
+    var selection: UUID? {
+        didSet {
+            if isEditing && selection != editingTaskID { cancelEdit() }
+            sendChange()
+        }
+    }
     var focusListToken: Int = 0 { didSet { sendChange() } }
     var showDatePicker: Bool = false { didSet { sendChange() } }
+    var editingTaskID: UUID? { didSet { sendChange() } }
+    var editText: String = "" { didSet { sendChange() } }
 
     private func sendChange() {
         DispatchQueue.main.async { [weak self] in
@@ -59,6 +71,7 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func shiftDay(_ delta: Int) {
+        if isEditing { cancelEdit() }
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {
             selectedDate = d
         }
@@ -73,6 +86,35 @@ final class PopoverViewModel: ObservableObject {
         toggleDone(taskID: id)
         return true
     }
+
+    func startEditing(taskID: UUID) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        editingTaskID = taskID
+        editText = task.text
+    }
+
+    func startEditingSelected() -> Bool {
+        guard let id = selection else { return false }
+        startEditing(taskID: id)
+        return true
+    }
+
+    func commitEdit() {
+        if let id = editingTaskID {
+            store.updateTaskText(dayKey: selectedKey, taskID: id, text: editText)
+        }
+        editingTaskID = nil
+        editText = ""
+        focusListToken += 1
+    }
+
+    func cancelEdit() {
+        editingTaskID = nil
+        editText = ""
+        focusListToken += 1
+    }
+
+    var isEditing: Bool { editingTaskID != nil }
 
     func deleteSelected() {
         guard let id = selection else { return }
@@ -105,17 +147,20 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func handleReset() {
+        if isEditing { cancelEdit() }
         selectedDate = Date()
         selection = nil
         focusToken += 1
     }
 
     func handleDateChange() {
+        if isEditing { cancelEdit() }
         selection = nil
         if isToday { focusToken += 1 } else { focusList() }
     }
 
     func handleAppear() {
+        if isEditing { cancelEdit() }
         if isToday { focusToken += 1 } else { focusList() }
     }
 
