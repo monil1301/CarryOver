@@ -2,6 +2,8 @@
 //  TaskListView.swift
 //  CarryOver
 //
+//  Created by Monil Shah on 07/03/26.
+//
 
 import SwiftUI
 
@@ -26,7 +28,28 @@ struct TaskListView: View {
             }
 
             if !viewModel.doneTasks.isEmpty {
-                Section("Completed") {
+                if viewModel.isToday {
+                    Divider()
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.right")
+                            .rotationEffect(.degrees(viewModel.isCompletedCollapsed ? 0 : 90))
+                            .font(.caption2)
+                        Text("Completed (\(viewModel.doneTasks.count))")
+                    }
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewModel.selection = PopoverViewModel.completedHeaderID
+                        withAnimation { viewModel.toggleCompletedCollapse() }
+                    }
+                    .tag(PopoverViewModel.completedHeaderID)
+                }
+
+                if !viewModel.isToday || !viewModel.isCompletedCollapsed {
                     ForEach(viewModel.doneTasks) { task in
                         TaskRowView(
                             task: task,
@@ -59,13 +82,29 @@ struct TaskListView: View {
 
         ListReturnKeyBridge(onReturn: {
             guard !viewModel.isEditing else { return false }
+            if viewModel.isCompletedHeaderSelected {
+                withAnimation { viewModel.toggleCompletedCollapse() }
+                return true
+            }
             return viewModel.startEditingSelected()
         })
         .frame(width: 0, height: 0)
 
         ListSpaceKeyBridge(isEditing: viewModel.isEditing, onSpace: {
-            viewModel.toggleSelectedDone()
+            if viewModel.isCompletedHeaderSelected {
+                withAnimation { viewModel.toggleCompletedCollapse() }
+                return true
+            }
+            return viewModel.toggleSelectedDone()
         })
+        .frame(width: 0, height: 0)
+
+        ListArrowKeyBridge(
+            isHeaderSelected: { viewModel.isCompletedHeaderSelected },
+            isCollapsed: { viewModel.isCompletedCollapsed },
+            onExpand: { withAnimation { viewModel.isCompletedCollapsed = false } },
+            onCollapse: { withAnimation { viewModel.isCompletedCollapsed = true } }
+        )
         .frame(width: 0, height: 0)
     }
 }

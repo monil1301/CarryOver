@@ -2,6 +2,8 @@
 //  PopoverViewModel.swift
 //  CarryOver
 //
+//  Created by Monil Shah on 07/03/26.
+//
 
 import SwiftUI
 internal import Combine
@@ -16,6 +18,7 @@ struct UndoAction: Equatable {
 @MainActor
 final class PopoverViewModel: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
+    static let completedHeaderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     let store: DailyStore
     let openSettings: () -> Void
@@ -38,6 +41,8 @@ final class PopoverViewModel: ObservableObject {
     var showDatePicker: Bool = false { didSet { sendChange() } }
     var editingTaskID: UUID? { didSet { sendChange() } }
     var editText: String = "" { didSet { sendChange() } }
+    var isCompletedCollapsed: Bool = true { didSet { sendChange() } }
+    var isCompletedHeaderSelected: Bool { selection == Self.completedHeaderID }
 
     var pendingUndo: UndoAction? { didSet { sendChange() } }
     private var undoTimer: DispatchWorkItem?
@@ -98,7 +103,7 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func toggleSelectedDone() -> Bool {
-        guard let id = selection else { return false }
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
         toggleDone(taskID: id)
         return true
     }
@@ -110,7 +115,7 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func startEditingSelected() -> Bool {
-        guard let id = selection else { return false }
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
         startEditing(taskID: id)
         return true
     }
@@ -139,7 +144,7 @@ final class PopoverViewModel: ObservableObject {
     var isEditing: Bool { editingTaskID != nil }
 
     func deleteSelected() {
-        guard let id = selection else { return }
+        guard let id = selection, !isCompletedHeaderSelected else { return }
         let key = selectedKey
         let tasksBefore = store.tasks(for: key)
         let idx = tasksBefore.firstIndex(where: { $0.id == id })
@@ -168,6 +173,10 @@ final class PopoverViewModel: ObservableObject {
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
         }
         store.deleteTask(dayKey: key, taskID: taskID)
+    }
+
+    func toggleCompletedCollapse() {
+        isCompletedCollapsed.toggle()
     }
 
     func focusList() {
