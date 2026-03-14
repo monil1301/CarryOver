@@ -121,9 +121,24 @@ final class DailyStore: ObservableObject {
         days[dayKey] = bucket
     }
     
+    func updateTaskText(dayKey: String, taskID: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard var bucket = days[dayKey],
+              let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        bucket.tasks[i].text = trimmed
+        days[dayKey] = bucket
+        save()
+    }
+
     func deleteTask(dayKey: String, taskID: UUID) {
         guard var bucket = days[dayKey] else { return }
         bucket.tasks.removeAll { $0.id == taskID }
+        days[dayKey] = bucket
+        save()
+    }
+
+    func restoreBucket(dayKey: String, bucket: DayBucket) {
         days[dayKey] = bucket
         save()
     }

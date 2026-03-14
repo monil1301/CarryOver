@@ -12,18 +12,36 @@ struct PopoverRootView: View {
     @EnvironmentObject var store: DailyStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PopoverHeaderView(viewModel: viewModel)
-            TaskInputView(viewModel: viewModel)
-            TaskListView(viewModel: viewModel)
-            Divider()
-            PopoverFooterView(openSettings: viewModel.openSettings)
+        ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 12) {
+                PopoverHeaderView(viewModel: viewModel)
+                TaskInputView(viewModel: viewModel)
+                TaskListView(viewModel: viewModel)
+                Divider()
+                PopoverFooterView(openSettings: viewModel.openSettings)
+            }
+            .padding()
+
+            if let undo = viewModel.pendingUndo {
+                UndoToastView(
+                    label: undo.label,
+                    onUndo: { viewModel.performUndo() },
+                    onDismiss: { viewModel.dismissUndo() }
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 44)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
+            }
         }
-        .padding()
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }
         .onChange(of: viewModel.selectedDate) { _ in viewModel.handleDateChange() }
         .onCommand(#selector(NSResponder.moveToBeginningOfParagraph(_:))) { }
+
+        Button("") { viewModel.performUndo() }
+            .keyboardShortcut("z", modifiers: .command)
+            .frame(width: 0, height: 0)
+            .opacity(0)
 
         ListUpArrowBridge(
             shouldHandle: { viewModel.isToday },

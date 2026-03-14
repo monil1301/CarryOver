@@ -6,6 +6,13 @@
 import SwiftUI
 internal import Combine
 
+struct UndoAction: Equatable {
+    let dayKey: String
+    let snapshot: DayBucket
+    let label: String
+    let selectionToRestore: UUID?
+}
+
 @MainActor
 final class PopoverViewModel: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
@@ -31,6 +38,9 @@ final class PopoverViewModel: ObservableObject {
     var showDatePicker: Bool = false { didSet { sendChange() } }
     var editingTaskID: UUID? { didSet { sendChange() } }
     var editText: String = "" { didSet { sendChange() } }
+
+    var pendingUndo: UndoAction? { didSet { sendChange() } }
+    private var undoTimer: DispatchWorkItem?
 
     private func sendChange() {
         DispatchQueue.main.async { [weak self] in
@@ -78,7 +88,13 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func toggleDone(taskID: UUID) {
-        store.toggleDone(dayKey: selectedKey, taskID: taskID)
+        let key = selectedKey
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            let label = task.isDone ? "Unmarked '\(task.text)'" : "Completed '\(task.text)'"
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
+        }
+        store.toggleDone(dayKey: key, taskID: taskID)
     }
 
     func toggleSelectedDone() -> Bool {
@@ -100,9 +116,15 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func commitEdit() {
-        if let id = editingTaskID {
-            store.updateTaskText(dayKey: selectedKey, taskID: id, text: editText)
+        guard let taskID = editingTaskID else { return }
+        let key = selectedKey
+
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Edited '\(task.text)'", selectionToRestore: taskID))
         }
+
+        store.updateTaskText(dayKey: key, taskID: taskID, text: editText)
         editingTaskID = nil
         editText = ""
         focusListToken += 1
@@ -118,12 +140,18 @@ final class PopoverViewModel: ObservableObject {
 
     func deleteSelected() {
         guard let id = selection else { return }
-        let tasksBefore = store.tasks(for: selectedKey)
+        let key = selectedKey
+        let tasksBefore = store.tasks(for: key)
         let idx = tasksBefore.firstIndex(where: { $0.id == id })
 
-        store.deleteTask(dayKey: selectedKey, taskID: id)
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == id }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: id))
+        }
 
-        let tasksAfter = store.tasks(for: selectedKey)
+        store.deleteTask(dayKey: key, taskID: id)
+
+        let tasksAfter = store.tasks(for: key)
         if let idx, !tasksAfter.isEmpty {
             selection = tasksAfter[min(idx, tasksAfter.count - 1)].id
         } else {
@@ -134,7 +162,12 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func deleteTask(taskID: UUID) {
-        store.deleteTask(dayKey: selectedKey, taskID: taskID)
+        let key = selectedKey
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
+        }
+        store.deleteTask(dayKey: key, taskID: taskID)
     }
 
     func focusList() {
@@ -179,6 +212,33 @@ final class PopoverViewModel: ObservableObject {
         DispatchQueue.main.async { [self] in
             focusListToken += 1
         }
+    }
+
+    // MARK: - Undo
+
+    func registerUndo(_ action: UndoAction) {
+        undoTimer?.cancel()
+        pendingUndo = action
+        let timer = DispatchWorkItem { [weak self] in
+            self?.dismissUndo()
+        }
+        undoTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timer)
+    }
+
+    func performUndo() {
+        guard let action = pendingUndo else { return }
+        store.restoreBucket(dayKey: action.dayKey, bucket: action.snapshot)
+        if selectedKey == action.dayKey, let sel = action.selectionToRestore {
+            selection = sel
+        }
+        dismissUndo()
+    }
+
+    func dismissUndo() {
+        undoTimer?.cancel()
+        undoTimer = nil
+        pendingUndo = nil
     }
 
     private static func prettyDate(_ date: Date) -> String {
