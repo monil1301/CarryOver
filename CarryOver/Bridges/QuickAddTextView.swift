@@ -15,6 +15,7 @@ struct QuickAddTextView: NSViewRepresentable {
     var onCommit: () -> Void
     var onMoveToList: () -> Void
     var onMoveToInput: () -> Void
+    var onMultiLinePaste: ([String]) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -34,6 +35,7 @@ struct QuickAddTextView: NSViewRepresentable {
         textView.onCommit = onCommit
         textView.onMoveToList = onMoveToList
         textView.onMoveToInput = onMoveToInput
+        textView.onMultiLinePaste = onMultiLinePaste
 
         textView.isRichText = false
         textView.importsGraphics = false
@@ -168,6 +170,20 @@ final class CommitTextView: NSTextView {
     var onCommit: (() -> Void)?
     var onMoveToList: (() -> Void)?
     var onMoveToInput: (() -> Void)?
+    var onMultiLinePaste: (([String]) -> Void)?
+
+    override func paste(_ sender: Any?) {
+        guard let raw = NSPasteboard.general.string(forType: .string) else {
+            super.paste(sender)
+            return
+        }
+        let tasks = PopoverViewModel.parsePastedTasks(raw)
+        if tasks.count >= 2 {
+            onMultiLinePaste?(tasks)
+        } else {
+            super.paste(sender)
+        }
+    }
 
     override func keyDown(with event: NSEvent) {
         // Return

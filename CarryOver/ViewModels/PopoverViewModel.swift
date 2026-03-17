@@ -85,6 +85,54 @@ final class PopoverViewModel: ObservableObject {
         focusToken += 1
     }
 
+    func addTasksFromPaste(_ texts: [String]) {
+        let key = selectedKey
+        let snapshot = store.days[key, default: DayBucket()]
+
+        store.addTasksToday(texts)
+
+        let count = store.tasks(for: key).count - snapshot.tasks.count
+        if count > 0 {
+            registerUndo(UndoAction(
+                dayKey: key,
+                snapshot: snapshot,
+                label: "\(count) tasks added",
+                selectionToRestore: selection
+            ))
+        }
+
+        newText = ""
+        focusToken += 1
+    }
+
+    static func parsePastedTasks(_ text: String) -> [String] {
+        let markerPattern = try! NSRegularExpression(pattern: #"^(\s*)([-*•+]|\[[ xX]\]|\d+[.)]) +(.*)"#)
+        let lines = text.components(separatedBy: .newlines)
+        var results: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+
+            let range = NSRange(line.startIndex..., in: line)
+            if let match = markerPattern.firstMatch(in: line, range: range) {
+                let taskText = String(line[Range(match.range(at: 3), in: line)!])
+                if !taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    results.append(taskText)
+                }
+            } else {
+                let leadingWhitespace = line.prefix(while: { $0 == " " || $0 == "\t" })
+                if !leadingWhitespace.isEmpty && !results.isEmpty {
+                    results[results.count - 1] += "\n" + trimmed
+                } else {
+                    results.append(trimmed)
+                }
+            }
+        }
+
+        return results.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
     func shiftDay(_ delta: Int) {
         if isEditing { cancelEdit() }
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {

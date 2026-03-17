@@ -19,7 +19,8 @@ struct TaskInputView: View {
                     placeholder: "Add a task…",
                     onCommit: { viewModel.addTask() },
                     onMoveToList: { viewModel.focusList() },
-                    onMoveToInput: { viewModel.focusInput() }
+                    onMoveToInput: { viewModel.focusInput() },
+                    onMultiLinePaste: { lines in viewModel.addTasksFromPaste(lines) }
                 )
                 .frame(height: 34)
 
