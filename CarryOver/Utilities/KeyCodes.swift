@@ -2,6 +2,8 @@
 //  KeyCodes.swift
 //  CarryOver
 //
+//  Created by Monil Shah on 06/03/26.
+//
 
 enum KeyCode {
     static let returnKey:     UInt16 = 36
@@ -13,4 +15,6 @@ enum KeyCode {
     static let space:         UInt16 = 49
     static let downArrow:     UInt16 = 125
     static let upArrow:       UInt16 = 126
+    static let leftArrow:     UInt16 = 123
+    static let rightArrow:    UInt16 = 124
 }

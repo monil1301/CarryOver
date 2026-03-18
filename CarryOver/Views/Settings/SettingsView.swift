@@ -8,10 +8,12 @@
 import SwiftUI
 import AppKit
 import HotKey
+import ServiceManagement
 
 struct SettingsView: View {
     let onChange: () -> Void
 
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isRecording = false
     @State private var displayText = HotkeyService.currentShortcutString()
 
@@ -88,6 +90,18 @@ struct SettingsView: View {
             displayText = HotkeyService.currentShortcutString()
         }
         
+        Divider()
+
+        Toggle("Open at Login", isOn: $launchAtLogin)
+            .padding(.horizontal, 16)
+            .onChange(of: launchAtLogin) { newValue in
+                if newValue {
+                    try? SMAppService.mainApp.register()
+                } else {
+                    try? SMAppService.mainApp.unregister()
+                }
+            }
+
         Divider()
 
         Text("Navigation shortcuts")

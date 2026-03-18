@@ -2,23 +2,50 @@
 //  PopoverViewModel.swift
 //  CarryOver
 //
+//  Created by Monil Shah on 07/03/26.
+//
 
 import SwiftUI
 internal import Combine
 
+struct UndoAction: Equatable {
+    let dayKey: String
+    let snapshot: DayBucket
+    let label: String
+    let selectionToRestore: UUID?
+}
+
 @MainActor
 final class PopoverViewModel: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
+    static let completedHeaderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     let store: DailyStore
     let openSettings: () -> Void
 
     var selectedDate: Date = Date() { didSet { sendChange() } }
     var newText: String = "" { didSet { sendChange() } }
-    var focusToken: Int = 0 { didSet { sendChange() } }
-    var selection: UUID? { didSet { sendChange() } }
+    var focusToken: Int = 0 {
+        didSet {
+            if isEditing { cancelEdit() }
+            sendChange()
+        }
+    }
+    var selection: UUID? {
+        didSet {
+            if isEditing && selection != editingTaskID { cancelEdit() }
+            sendChange()
+        }
+    }
     var focusListToken: Int = 0 { didSet { sendChange() } }
     var showDatePicker: Bool = false { didSet { sendChange() } }
+    var editingTaskID: UUID? { didSet { sendChange() } }
+    var editText: String = "" { didSet { sendChange() } }
+    var isCompletedCollapsed: Bool = true { didSet { sendChange() } }
+    var isCompletedHeaderSelected: Bool { selection == Self.completedHeaderID }
+
+    var pendingUndo: UndoAction? { didSet { sendChange() } }
+    private var undoTimer: DispatchWorkItem?
 
     private func sendChange() {
         DispatchQueue.main.async { [weak self] in
@@ -58,24 +85,126 @@ final class PopoverViewModel: ObservableObject {
         focusToken += 1
     }
 
+    func addTasksFromPaste(_ texts: [String]) {
+        let key = selectedKey
+        let snapshot = store.days[key, default: DayBucket()]
+
+        store.addTasksToday(texts)
+
+        let count = store.tasks(for: key).count - snapshot.tasks.count
+        if count > 0 {
+            registerUndo(UndoAction(
+                dayKey: key,
+                snapshot: snapshot,
+                label: "\(count) tasks added",
+                selectionToRestore: selection
+            ))
+        }
+
+        newText = ""
+        focusToken += 1
+    }
+
+    static func parsePastedTasks(_ text: String) -> [String] {
+        let markerPattern = try! NSRegularExpression(pattern: #"^(\s*)([-*•+]|\[[ xX]\]|\d+[.)]) +(.*)"#)
+        let lines = text.components(separatedBy: .newlines)
+        var results: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+
+            let range = NSRange(line.startIndex..., in: line)
+            if let match = markerPattern.firstMatch(in: line, range: range) {
+                let taskText = String(line[Range(match.range(at: 3), in: line)!])
+                if !taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    results.append(taskText)
+                }
+            } else {
+                let leadingWhitespace = line.prefix(while: { $0 == " " || $0 == "\t" })
+                if !leadingWhitespace.isEmpty && !results.isEmpty {
+                    results[results.count - 1] += "\n" + trimmed
+                } else {
+                    results.append(trimmed)
+                }
+            }
+        }
+
+        return results.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
     func shiftDay(_ delta: Int) {
+        if isEditing { cancelEdit() }
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {
             selectedDate = d
         }
     }
 
     func toggleDone(taskID: UUID) {
-        store.toggleDone(dayKey: selectedKey, taskID: taskID)
+        let key = selectedKey
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            let label = task.isDone ? "Unmarked '\(task.text)'" : "Completed '\(task.text)'"
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
+        }
+        store.toggleDone(dayKey: key, taskID: taskID)
     }
 
+    func toggleSelectedDone() -> Bool {
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
+        toggleDone(taskID: id)
+        return true
+    }
+
+    func startEditing(taskID: UUID) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        editingTaskID = taskID
+        editText = task.text
+    }
+
+    func startEditingSelected() -> Bool {
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
+        startEditing(taskID: id)
+        return true
+    }
+
+    func commitEdit() {
+        guard let taskID = editingTaskID else { return }
+        let key = selectedKey
+
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Edited '\(task.text)'", selectionToRestore: taskID))
+        }
+
+        store.updateTaskText(dayKey: key, taskID: taskID, text: editText)
+        editingTaskID = nil
+        editText = ""
+        focusListToken += 1
+    }
+
+    func cancelEdit() {
+        editingTaskID = nil
+        editText = ""
+        focusListToken += 1
+    }
+
+    var isEditing: Bool { editingTaskID != nil }
+
     func deleteSelected() {
-        guard let id = selection else { return }
-        let tasksBefore = store.tasks(for: selectedKey)
+        guard let id = selection, !isCompletedHeaderSelected else { return }
+        let key = selectedKey
+        let tasksBefore = store.tasks(for: key)
         let idx = tasksBefore.firstIndex(where: { $0.id == id })
 
-        store.deleteTask(dayKey: selectedKey, taskID: id)
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == id }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: id))
+        }
 
-        let tasksAfter = store.tasks(for: selectedKey)
+        store.deleteTask(dayKey: key, taskID: id)
+
+        let tasksAfter = store.tasks(for: key)
         if let idx, !tasksAfter.isEmpty {
             selection = tasksAfter[min(idx, tasksAfter.count - 1)].id
         } else {
@@ -86,7 +215,16 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func deleteTask(taskID: UUID) {
-        store.deleteTask(dayKey: selectedKey, taskID: taskID)
+        let key = selectedKey
+        if let bucket = store.days[key],
+           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
+        }
+        store.deleteTask(dayKey: key, taskID: taskID)
+    }
+
+    func toggleCompletedCollapse() {
+        isCompletedCollapsed.toggle()
     }
 
     func focusList() {
@@ -99,17 +237,20 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func handleReset() {
+        if isEditing { cancelEdit() }
         selectedDate = Date()
         selection = nil
         focusToken += 1
     }
 
     func handleDateChange() {
+        if isEditing { cancelEdit() }
         selection = nil
         if isToday { focusToken += 1 } else { focusList() }
     }
 
     func handleAppear() {
+        if isEditing { cancelEdit() }
         if isToday { focusToken += 1 } else { focusList() }
     }
 
@@ -128,6 +269,33 @@ final class PopoverViewModel: ObservableObject {
         DispatchQueue.main.async { [self] in
             focusListToken += 1
         }
+    }
+
+    // MARK: - Undo
+
+    func registerUndo(_ action: UndoAction) {
+        undoTimer?.cancel()
+        pendingUndo = action
+        let timer = DispatchWorkItem { [weak self] in
+            self?.dismissUndo()
+        }
+        undoTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timer)
+    }
+
+    func performUndo() {
+        guard let action = pendingUndo else { return }
+        store.restoreBucket(dayKey: action.dayKey, bucket: action.snapshot)
+        if selectedKey == action.dayKey, let sel = action.selectionToRestore {
+            selection = sel
+        }
+        dismissUndo()
+    }
+
+    func dismissUndo() {
+        undoTimer?.cancel()
+        undoTimer = nil
+        pendingUndo = nil
     }
 
     private static func prettyDate(_ date: Date) -> String {

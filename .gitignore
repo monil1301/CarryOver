@@ -1,0 +1,18 @@
+# Xcode build artifacts
+build/
+DerivedData/
+
+# Xcode user data
+*.xcuserstate
+xcuserdata/
+
+# SPM
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+
+# Release artifacts
+*.app.zip
+*.app.zip.sha256

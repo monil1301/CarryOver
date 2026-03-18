@@ -70,6 +70,19 @@ final class DailyStore: ObservableObject {
         save()
     }
 
+    func addTasksToday(_ texts: [String]) {
+        let key = todayKey
+        var bucket = days[key, default: DayBucket()]
+        let insertIndex = bucket.tasks.firstIndex(where: { $0.isDone }) ?? bucket.tasks.count
+        for (i, text) in texts.enumerated() {
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { continue }
+            bucket.tasks.insert(TaskItem(text: t), at: insertIndex + i)
+        }
+        days[key] = bucket
+        save()
+    }
+
     func toggleDone(dayKey: String, taskID: UUID) {
         guard var bucket = days[dayKey],
               let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
@@ -121,9 +134,24 @@ final class DailyStore: ObservableObject {
         days[dayKey] = bucket
     }
     
+    func updateTaskText(dayKey: String, taskID: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard var bucket = days[dayKey],
+              let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        bucket.tasks[i].text = trimmed
+        days[dayKey] = bucket
+        save()
+    }
+
     func deleteTask(dayKey: String, taskID: UUID) {
         guard var bucket = days[dayKey] else { return }
         bucket.tasks.removeAll { $0.id == taskID }
+        days[dayKey] = bucket
+        save()
+    }
+
+    func restoreBucket(dayKey: String, bucket: DayBucket) {
         days[dayKey] = bucket
         save()
     }
