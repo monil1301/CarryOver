@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TaskListView: View {
     @ObservedObject var viewModel: PopoverViewModel
@@ -16,6 +17,8 @@ struct TaskListView: View {
                 TaskRowView(
                     task: task,
                     isEditing: viewModel.editingTaskID == task.id,
+                    isSelected: viewModel.selection == task.id,
+                    isToday: viewModel.isToday,
                     editText: $viewModel.editText,
                     onToggle: { viewModel.toggleDone(taskID: task.id) },
                     onEdit: { viewModel.startEditing(taskID: task.id) },
@@ -25,6 +28,28 @@ struct TaskListView: View {
                     onSelect: { viewModel.selectTask(task.id) }
                 )
                 .tag(task.id)
+                .opacity(viewModel.draggingTaskID == task.id ? 0.3 : 1.0)
+                .onDrag {
+                    viewModel.beginDrag(taskID: task.id)
+                    return NSItemProvider(object: task.id.uuidString as NSString)
+                } preview: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle")
+                            .foregroundStyle(.secondary)
+                        Text(task.text)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(width: 280, alignment: .leading)
+                    .background(.background)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                }
+                .onDrop(of: [.text], delegate: TaskReorderDropDelegate(
+                    targetTaskID: task.id,
+                    viewModel: viewModel
+                ))
             }
 
             if !viewModel.doneTasks.isEmpty {
@@ -54,6 +79,8 @@ struct TaskListView: View {
                         TaskRowView(
                             task: task,
                             isEditing: viewModel.editingTaskID == task.id,
+                            isSelected: viewModel.selection == task.id,
+                            isToday: viewModel.isToday,
                             editText: $viewModel.editText,
                             onToggle: { viewModel.toggleDone(taskID: task.id) },
                             onEdit: { viewModel.startEditing(taskID: task.id) },
@@ -106,5 +133,39 @@ struct TaskListView: View {
             onCollapse: { withAnimation { viewModel.isCompletedCollapsed = true } }
         )
         .frame(width: 0, height: 0)
+
+        ListReorderKeyBridge(
+            onMoveUp: { viewModel.moveSelectedTask(direction: -1) },
+            onMoveDown: { viewModel.moveSelectedTask(direction: 1) }
+        )
+        .frame(width: 0, height: 0)
+    }
+}
+
+struct TaskReorderDropDelegate: DropDelegate {
+    let targetTaskID: UUID
+    let viewModel: PopoverViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedID = viewModel.draggingTaskID,
+              draggedID != targetTaskID else { return }
+
+        let undone = viewModel.undoneTasks
+        guard let fromIndex = undone.firstIndex(where: { $0.id == draggedID }),
+              let toIndex = undone.firstIndex(where: { $0.id == targetTaskID }) else { return }
+
+        let destination = toIndex > fromIndex ? toIndex + 1 : toIndex
+        withAnimation(.easeInOut(duration: 0.15)) {
+            viewModel.reorderUndoneTasks(fromOffsets: IndexSet(integer: fromIndex), toOffset: destination)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        viewModel.endDrag()
+        return true
     }
 }

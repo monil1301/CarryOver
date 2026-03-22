@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PopoverRootView: View {
     @ObservedObject var viewModel: PopoverViewModel
@@ -32,6 +33,10 @@ struct PopoverRootView: View {
                 .padding(.bottom, 44)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
             }
+        }
+        .onDrop(of: [.text], isTargeted: nil) { _ in
+            viewModel.endDrag()
+            return true
         }
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }

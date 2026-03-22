@@ -151,6 +151,30 @@ final class DailyStore: ObservableObject {
         save()
     }
 
+    func moveTask(dayKey: String, taskID: UUID, direction: Int) {
+        guard var bucket = days[dayKey],
+              let idx = bucket.tasks.firstIndex(where: { $0.id == taskID }),
+              !bucket.tasks[idx].isDone else { return }
+
+        let undoneCount = bucket.tasks.prefix(while: { !$0.isDone }).count
+        let newIdx = idx + direction
+        guard newIdx >= 0, newIdx < undoneCount else { return }
+
+        bucket.tasks.swapAt(idx, newIdx)
+        days[dayKey] = bucket
+        save()
+    }
+
+    func reorderUndoneTasks(dayKey: String, fromOffsets: IndexSet, toOffset: Int) {
+        guard var bucket = days[dayKey] else { return }
+        var undone = bucket.tasks.filter { !$0.isDone }
+        let done = bucket.tasks.filter { $0.isDone }
+        undone.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        bucket.tasks = undone + done
+        days[dayKey] = bucket
+        save()
+    }
+
     func restoreBucket(dayKey: String, bucket: DayBucket) {
         days[dayKey] = bucket
         save()

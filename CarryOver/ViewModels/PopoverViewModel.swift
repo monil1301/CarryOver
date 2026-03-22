@@ -42,6 +42,8 @@ final class PopoverViewModel: ObservableObject {
     var editingTaskID: UUID? { didSet { sendChange() } }
     var editText: String = "" { didSet { sendChange() } }
     var isCompletedCollapsed: Bool = true { didSet { sendChange() } }
+    var draggingTaskID: UUID? { didSet { sendChange() } }
+    var dragSnapshot: DayBucket?
     var isCompletedHeaderSelected: Bool { selection == Self.completedHeaderID }
 
     var pendingUndo: UndoAction? { didSet { sendChange() } }
@@ -221,6 +223,49 @@ final class PopoverViewModel: ObservableObject {
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
         }
         store.deleteTask(dayKey: key, taskID: taskID)
+    }
+
+    func moveSelectedTask(direction: Int) -> Bool {
+        guard isToday, !isEditing,
+              let id = selection, !isCompletedHeaderSelected,
+              let task = undoneTasks.first(where: { $0.id == id }),
+              !task.isDone else { return false }
+
+        let key = selectedKey
+        let snapshot = store.days[key, default: DayBucket()]
+        store.moveTask(dayKey: key, taskID: id, direction: direction)
+
+        // Check if move actually happened
+        let newTasks = store.tasks(for: key)
+        if newTasks.map(\.id) != snapshot.tasks.map(\.id) {
+            registerUndo(UndoAction(dayKey: key, snapshot: snapshot, label: "Moved '\(task.text)'", selectionToRestore: id))
+        }
+        return true
+    }
+
+    func reorderUndoneTasks(fromOffsets: IndexSet, toOffset: Int) {
+        guard isToday, !isEditing else { return }
+        let key = selectedKey
+        store.reorderUndoneTasks(dayKey: key, fromOffsets: fromOffsets, toOffset: toOffset)
+    }
+
+    func beginDrag(taskID: UUID) {
+        let key = selectedKey
+        dragSnapshot = store.days[key, default: DayBucket()]
+        draggingTaskID = taskID
+    }
+
+    func endDrag() {
+        guard draggingTaskID != nil else { return }
+        if let snapshot = dragSnapshot, let id = draggingTaskID {
+            let key = selectedKey
+            if store.tasks(for: key).map(\.id) != snapshot.tasks.map(\.id) {
+                registerUndo(UndoAction(dayKey: key, snapshot: snapshot, label: "Reordered tasks", selectionToRestore: id))
+            }
+            selection = id
+        }
+        draggingTaskID = nil
+        dragSnapshot = nil
     }
 
     func toggleCompletedCollapse() {
