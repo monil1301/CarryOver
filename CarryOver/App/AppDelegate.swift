@@ -6,12 +6,16 @@
 import AppKit
 import SwiftUI
 import HotKey
+internal import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
     private let store = DailyStore()
     private var viewModel: PopoverViewModel?
     private var hotKey: HotKey?
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+    )
 
     private var settingsWindow: NSWindow?
 
@@ -52,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let root = SettingsView { [weak self] in
+        let root = SettingsView(updater: updaterController.updater) { [weak self] in
             self?.reloadHotKey()
         }
 
