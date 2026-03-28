@@ -16,6 +16,7 @@ struct SettingsView: View {
     let onChange: () -> Void
 
     @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
+    @State private var autoCheckForUpdates = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isRecording = false
     @State private var displayText = HotkeyService.currentShortcutString()
@@ -95,6 +96,7 @@ struct SettingsView: View {
         .padding(16)
         .frame(width: 420, height: isRecording ? 260 : 170)
         .onAppear {
+            NSApp.activate(ignoringOtherApps: true)
             HotkeyService.registerDefaults()
             displayText = HotkeyService.currentShortcutString()
         }
@@ -113,11 +115,12 @@ struct SettingsView: View {
 
         Divider()
 
-        Toggle("Check for updates automatically", isOn: Binding(
-            get: { updater.automaticallyChecksForUpdates },
-            set: { updater.automaticallyChecksForUpdates = $0 }
-        ))
-        .padding(.horizontal, 16)
+        Toggle("Check for updates automatically", isOn: $autoCheckForUpdates)
+            .padding(.horizontal, 16)
+            .onAppear { autoCheckForUpdates = updater.automaticallyChecksForUpdates }
+            .onChange(of: autoCheckForUpdates) { newValue in
+                updater.automaticallyChecksForUpdates = newValue
+            }
 
         Button("Check now") {
             updater.checkForUpdates()

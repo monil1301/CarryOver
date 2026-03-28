@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+internal import Sparkle
 
 struct PopoverRootView: View {
     @ObservedObject var viewModel: PopoverViewModel
     @EnvironmentObject var store: DailyStore
+    @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -18,6 +20,11 @@ struct PopoverRootView: View {
                 TaskInputView(viewModel: viewModel)
                 TaskListView(viewModel: viewModel)
                 Divider()
+                if let version = updateAvailable.availableVersion {
+                    UpdateBannerView(version: version) {
+                        updateAvailable.updater?.checkForUpdates()
+                    }
+                }
                 PopoverFooterView()
             }
             .padding()

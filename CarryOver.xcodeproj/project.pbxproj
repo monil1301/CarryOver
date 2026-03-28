@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AF33F7112F76FB5000640A0A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AF7206012F6400000009775E /* Sparkle */; };
 		AF7205E02F5AB4C40009775E /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = AF7205DF2F5AB4C40009775E /* HotKey */; };
 /* End PBXBuildFile section */
 
@@ -27,8 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF33F7112F76FB5000640A0A /* Sparkle in Frameworks */,
 				AF7205E02F5AB4C40009775E /* HotKey in Frameworks */,
-				AF7206022F6400000009775E /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

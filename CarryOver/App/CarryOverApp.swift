@@ -14,7 +14,7 @@ struct CarryOverApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView(updater: appDelegate.updater) {
+            SettingsView(updater: appDelegate.updaterController.updater) {
                 appDelegate.reloadHotKey()
             }
         }
