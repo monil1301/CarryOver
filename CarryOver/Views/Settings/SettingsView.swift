@@ -9,13 +9,22 @@ import SwiftUI
 import AppKit
 import HotKey
 import ServiceManagement
+internal import Sparkle
 
 struct SettingsView: View {
+    let updater: SPUUpdater
     let onChange: () -> Void
 
+    @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isRecording = false
     @State private var displayText = HotkeyService.currentShortcutString()
+
+    init(updater: SPUUpdater, onChange: @escaping () -> Void) {
+        self.updater = updater
+        self.onChange = onChange
+        self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -101,6 +110,20 @@ struct SettingsView: View {
                     try? SMAppService.mainApp.unregister()
                 }
             }
+
+        Divider()
+
+        Toggle("Check for updates automatically", isOn: Binding(
+            get: { updater.automaticallyChecksForUpdates },
+            set: { updater.automaticallyChecksForUpdates = $0 }
+        ))
+        .padding(.horizontal, 16)
+
+        Button("Check now") {
+            updater.checkForUpdates()
+        }
+        .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+        .padding(.horizontal, 16)
 
         Divider()
 
