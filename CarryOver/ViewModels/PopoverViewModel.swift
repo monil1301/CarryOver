@@ -21,8 +21,6 @@ final class PopoverViewModel: ObservableObject {
     static let completedHeaderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     let store: DailyStore
-    let openSettings: () -> Void
-
     var selectedDate: Date = Date() { didSet { sendChange() } }
     var newText: String = "" { didSet { sendChange() } }
     var focusToken: Int = 0 {
@@ -69,9 +67,8 @@ final class PopoverViewModel: ObservableObject {
 
     private var storeCancellable: AnyCancellable?
 
-    init(store: DailyStore, openSettings: @escaping () -> Void) {
+    init(store: DailyStore) {
         self.store = store
-        self.openSettings = openSettings
         storeCancellable = store.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in

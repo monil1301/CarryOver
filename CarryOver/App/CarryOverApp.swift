@@ -11,13 +11,10 @@ internal import Sparkle
 @main
 struct CarryOverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil
-    )
 
     var body: some Scene {
         Settings {
-            SettingsView(updater: updaterController.updater) {
+            SettingsView(updater: appDelegate.updater) {
                 appDelegate.reloadHotKey()
             }
         }

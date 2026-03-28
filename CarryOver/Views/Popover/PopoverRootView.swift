@@ -18,7 +18,7 @@ struct PopoverRootView: View {
                 TaskInputView(viewModel: viewModel)
                 TaskListView(viewModel: viewModel)
                 Divider()
-                PopoverFooterView(openSettings: viewModel.openSettings)
+                PopoverFooterView()
             }
             .padding()
 
