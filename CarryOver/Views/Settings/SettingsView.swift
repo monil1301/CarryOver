@@ -96,9 +96,12 @@ struct SettingsView: View {
         .padding(16)
         .frame(width: 420, height: isRecording ? 260 : 170)
         .onAppear {
-            NSApp.activate(ignoringOtherApps: true)
             HotkeyService.registerDefaults()
             displayText = HotkeyService.currentShortcutString()
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first { $0.title == "CarryOver Settings" }?.makeKeyAndOrderFront(nil)
+            }
         }
         
         Divider()
