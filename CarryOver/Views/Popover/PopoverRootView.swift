@@ -14,20 +14,11 @@ struct PopoverRootView: View {
     @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 12) {
-                PopoverHeaderView(viewModel: viewModel)
-                TaskInputView(viewModel: viewModel)
-                TaskListView(viewModel: viewModel)
-                Divider()
-                if let version = updateAvailable.availableVersion {
-                    UpdateBannerView(version: version) {
-                        updateAvailable.updater?.checkForUpdates()
-                    }
-                }
-                PopoverFooterView()
-            }
-            .padding()
+        VStack(alignment: .leading, spacing: 12) {
+            PopoverHeaderView(viewModel: viewModel)
+            TaskInputView(viewModel: viewModel)
+            TaskListView(viewModel: viewModel)
+            Divider()
 
             if let undo = viewModel.pendingUndo {
                 UndoToastView(
@@ -35,11 +26,18 @@ struct PopoverRootView: View {
                     onUndo: { viewModel.performUndo() },
                     onDismiss: { viewModel.dismissUndo() }
                 )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 44)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
                 .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
+            } else if let version = updateAvailable.availableVersion {
+                UpdateBannerView(version: version) {
+                    updateAvailable.updater?.checkForUpdates()
+                }
+                .transition(.opacity)
             }
+
+            PopoverFooterView()
         }
+        .padding()
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }
         .onChange(of: viewModel.selectedDate) { _ in viewModel.handleDateChange() }
