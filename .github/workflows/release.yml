@@ -55,7 +55,10 @@ jobs:
           set -euo pipefail
           SIGN_TOOL="spm/artifacts/sparkle/Sparkle/bin/sign_update"
           chmod +x "$SIGN_TOOL"
-          SIGNATURE=$("$SIGN_TOOL" CarryOver.app.zip -f "$SPARKLE_PRIVATE_KEY" | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          KEY_FILE=$(mktemp)
+          echo -n "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          SIGNATURE=$("$SIGN_TOOL" CarryOver.app.zip -f "$KEY_FILE" | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          rm -f "$KEY_FILE"
           LENGTH=$(stat -f%z CarryOver.app.zip)
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "SPARKLE_LENGTH=$LENGTH" >> $GITHUB_ENV
