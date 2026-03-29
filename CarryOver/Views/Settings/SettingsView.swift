@@ -9,13 +9,23 @@ import SwiftUI
 import AppKit
 import HotKey
 import ServiceManagement
+internal import Sparkle
 
 struct SettingsView: View {
+    let updater: SPUUpdater
     let onChange: () -> Void
 
+    @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
+    @State private var autoCheckForUpdates = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isRecording = false
     @State private var displayText = HotkeyService.currentShortcutString()
+
+    init(updater: SPUUpdater, onChange: @escaping () -> Void) {
+        self.updater = updater
+        self.onChange = onChange
+        self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -88,6 +98,10 @@ struct SettingsView: View {
         .onAppear {
             HotkeyService.registerDefaults()
             displayText = HotkeyService.currentShortcutString()
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first { $0.title == "CarryOver Settings" }?.makeKeyAndOrderFront(nil)
+            }
         }
         
         Divider()
@@ -101,6 +115,21 @@ struct SettingsView: View {
                     try? SMAppService.mainApp.unregister()
                 }
             }
+
+        Divider()
+
+        Toggle("Check for updates automatically", isOn: $autoCheckForUpdates)
+            .padding(.horizontal, 16)
+            .onAppear { autoCheckForUpdates = updater.automaticallyChecksForUpdates }
+            .onChange(of: autoCheckForUpdates) { newValue in
+                updater.automaticallyChecksForUpdates = newValue
+            }
+
+        Button("Check now") {
+            updater.checkForUpdates()
+        }
+        .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+        .padding(.horizontal, 16)
 
         Divider()
 

@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build (Release)
         run: |
@@ -25,6 +27,7 @@ jobs:
             -configuration Release \
             -destination "platform=macOS" \
             -derivedDataPath build \
+            -clonedSourcePackagesDirPath spm \
             clean build
 
       - name: Locate .app
@@ -43,6 +46,64 @@ jobs:
           set -euo pipefail
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CarryOver.app.zip
           shasum -a 256 CarryOver.app.zip > CarryOver.app.zip.sha256
+
+      - name: Sign update with Sparkle
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          SIGN_TOOL="spm/artifacts/sparkle/Sparkle/bin/sign_update"
+          chmod +x "$SIGN_TOOL"
+          SIGNATURE=$("$SIGN_TOOL" CarryOver.app.zip -f "$SPARKLE_PRIVATE_KEY" | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          LENGTH=$(stat -f%z CarryOver.app.zip)
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+          echo "SPARKLE_LENGTH=$LENGTH" >> $GITHUB_ENV
+
+      - name: Update appcast.xml
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/CarryOver.app.zip"
+          PUB_DATE=$(date -R)
+
+          cat > appcast.xml << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>CarryOver Updates</title>
+              <link>https://monil1301.github.io/CarryOver/appcast.xml</link>
+              <description>Updates for CarryOver</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <pubDate>${PUB_DATE}</pubDate>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <enclosure
+                  url="${DOWNLOAD_URL}"
+                  sparkle:edSignature="${SPARKLE_SIGNATURE}"
+                  length="${SPARKLE_LENGTH}"
+                  type="application/octet-stream"
+                />
+              </item>
+            </channel>
+          </rss>
+          EOF
+
+          # Push appcast.xml to gh-pages branch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gh-pages-tmp
+          git rm -rf . > /dev/null 2>&1 || true
+          mv appcast.xml .
+          git add appcast.xml
+          git commit -m "Update appcast for ${TAG}"
+          git push origin gh-pages-tmp:gh-pages --force
 
       - name: Create GitHub Release and upload assets
         if: startsWith(github.ref, 'refs/tags/')

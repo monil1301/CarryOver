@@ -8,13 +8,9 @@
 import SwiftUI
 
 struct PopoverFooterView: View {
-    let openSettings: () -> Void
-
     var body: some View {
         HStack {
-            Button {
-                openSettings()
-            } label: {
+            SettingsLink {
                 Image(systemName: "gearshape")
                 Text("Settings")
             }

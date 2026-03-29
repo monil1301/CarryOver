@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AF33F7112F76FB5000640A0A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AF7206012F6400000009775E /* Sparkle */; };
 		AF7205E02F5AB4C40009775E /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = AF7205DF2F5AB4C40009775E /* HotKey */; };
 /* End PBXBuildFile section */
 
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF33F7112F76FB5000640A0A /* Sparkle in Frameworks */,
 				AF7205E02F5AB4C40009775E /* HotKey in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = CarryOver;
 			packageProductDependencies = (
 				AF7205DF2F5AB4C40009775E /* HotKey */,
+				AF7206012F6400000009775E /* Sparkle */,
 			);
 			productName = CarryOver;
 			productReference = AF7205CD2F59AA4F0009775E /* CarryOver.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AF7205DE2F5AB4C40009775E /* XCRemoteSwiftPackageReference "HotKey" */,
+				AF7206002F6400000009775E /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AF7205CE2F59AA4F0009775E /* Products */;
@@ -257,13 +261,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CarryOver/CarryOver.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CarryOver/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -288,13 +292,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CarryOver/CarryOver.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CarryOver/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -346,6 +350,14 @@
 				kind = branch;
 			};
 		};
+		AF7206002F6400000009775E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -353,6 +365,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AF7205DE2F5AB4C40009775E /* XCRemoteSwiftPackageReference "HotKey" */;
 			productName = HotKey;
+		};
+		AF7206012F6400000009775E /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF7206002F6400000009775E /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
