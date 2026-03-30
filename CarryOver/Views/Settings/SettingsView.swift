@@ -6,143 +6,93 @@
 //
 
 import SwiftUI
-import AppKit
-import HotKey
-import ServiceManagement
 internal import Sparkle
+
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case general
+    case hotkey
+    // Future tabs:
+    // case data
+    // case advanced
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .general:  return "General"
+        case .hotkey:   return "Hotkey"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .general:  return "gearshape"
+        case .hotkey:   return "keyboard"
+        }
+    }
+}
 
 struct SettingsView: View {
     let updater: SPUUpdater
     let onChange: () -> Void
 
-    @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
-    @State private var autoCheckForUpdates = true
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var isRecording = false
-    @State private var displayText = HotkeyService.currentShortcutString()
-
-    init(updater: SPUUpdater, onChange: @escaping () -> Void) {
-        self.updater = updater
-        self.onChange = onChange
-        self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
-    }
+    @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Hotkey")
-                .font(.headline)
-
-            HStack {
-                Text("Current:")
-                    .foregroundStyle(.secondary)
-                Text(displayText)
-                    .font(.system(.body, design: .monospaced))
-                Spacer()
-            }
-
-            if isRecording {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Press a shortcut now…")
-                        .font(.subheadline)
-
-                    Text("• Must include at least one modifier (⌘ ⌥ ⌃ ⇧)\n• Esc to cancel\n• Delete to clear")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    // Invisible-ish capture surface
-                    ShortcutRecorder(
-                        onCancel: {
-                            isRecording = false
-                        },
-                        onClear: {
-                            // Reset to default
-                            HotkeyService.registerDefaults()
-                            let (key, mods) = HotkeyService.load()
-                            let keyName = HotkeyService.availableKeys.first(where: { $0.key == key })?.name ?? "space"
-                            HotkeyService.save(keyName: keyName, modifiers: mods)
-                            displayText = HotkeyService.format(keyName: keyName, modifiers: mods)
-                            isRecording = false
-                            onChange()
-                        },
-                        onRecorded: { keyName, mods in
-                            HotkeyService.save(keyName: keyName, modifiers: mods)
-                            displayText = HotkeyService.format(keyName: keyName, modifiers: mods)
-                            isRecording = false
-                            onChange()
-                        }
-                    )
-                    .frame(height: 1) // capture focus without showing a big control
-                }
-                .padding(10)
-                .background(.ultraThinMaterial)
-                .cornerRadius(10)
-            }
-
-            HStack {
-                Button(isRecording ? "Recording…" : "Record Shortcut") {
-                    isRecording.toggle()
-                }
-                .keyboardShortcut(.defaultAction)
-
-                Spacer()
-
-                Button("Close") {
-                    NSApp.keyWindow?.close()
+        VStack(spacing: 0) {
+            // Toolbar-style tab picker
+            HStack(spacing: 20) {
+                ForEach(SettingsTab.allCases) { tab in
+                    SettingsTabButton(tab: tab, isSelected: selectedTab == tab) {
+                        selectedTab = tab
+                    }
                 }
             }
+            .padding(.top, 10)
+            .padding(.bottom, 8)
 
-            Spacer()
+            Divider()
+
+            // Tab content
+            Group {
+                switch selectedTab {
+                case .general:
+                    GeneralSettingsTab(updater: updater)
+                case .hotkey:
+                    HotkeySettingsTab(onChange: onChange)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .padding(16)
-        .frame(width: 420, height: isRecording ? 260 : 170)
+        .frame(width: 400, height: 280)
         .onAppear {
-            HotkeyService.registerDefaults()
-            displayText = HotkeyService.currentShortcutString()
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)
                 NSApp.windows.first { $0.title == "CarryOver Settings" }?.makeKeyAndOrderFront(nil)
             }
         }
-        
-        Divider()
+    }
+}
 
-        Toggle("Open at Login", isOn: $launchAtLogin)
-            .padding(.horizontal, 16)
-            .onChange(of: launchAtLogin) { newValue in
-                if newValue {
-                    try? SMAppService.mainApp.register()
-                } else {
-                    try? SMAppService.mainApp.unregister()
-                }
+// MARK: - Tab Button
+
+private struct SettingsTabButton: View {
+    let tab: SettingsTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 18))
+                Text(tab.label)
+                    .font(.caption)
             }
-
-        Divider()
-
-        Toggle("Check for updates automatically", isOn: $autoCheckForUpdates)
-            .padding(.horizontal, 16)
-            .onAppear { autoCheckForUpdates = updater.automaticallyChecksForUpdates }
-            .onChange(of: autoCheckForUpdates) { newValue in
-                updater.automaticallyChecksForUpdates = newValue
-            }
-
-        Button("Check now") {
-            updater.checkForUpdates()
+            .foregroundStyle(isSelected ? .primary : .secondary)
+            .frame(width: 64, height: 40)
+            .contentShape(Rectangle())
         }
-        .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
-        .padding(.horizontal, 16)
-
-        Divider()
-
-        Text("Navigation shortcuts")
-            .font(.headline)
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text("• Today: ⌘T")
-            Text("• Previous day: ⌘[")
-            Text("• Next day: ⌘]")
-            Text("• Pick date: ⌘P")
-        }
-        .font(.system(.body, design: .monospaced))
-        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
     }
 }
