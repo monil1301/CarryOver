@@ -6,6 +6,7 @@
 import AppKit
 import SwiftUI
 import HotKey
+internal import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
@@ -13,20 +14,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var viewModel: PopoverViewModel?
     private var hotKey: HotKey?
 
-    private var settingsWindow: NSWindow?
+    let updateAvailable = UpdateAvailableViewModel()
+    private(set) lazy var updaterDelegate: UpdaterDelegate = UpdaterDelegate(updateAvailable: updateAvailable)
+    private(set) lazy var updaterController: SPUStandardUpdaterController = {
+        let controller = SPUStandardUpdaterController(
+            startingUpdater: true, updaterDelegate: updaterDelegate, userDriverDelegate: updaterDelegate
+        )
+        updateAvailable.updater = controller.updater
+        return controller
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         HotkeyService.registerDefaults()
         store.load()
 
-        let vm = PopoverViewModel(store: store, openSettings: { [weak self] in
-            self?.statusBar?.hidePopover(restoreFocus: false)
-            self?.openSettings()
-        })
+        _ = updaterController // ensure initialized
+
+        let vm = PopoverViewModel(store: store)
         viewModel = vm
 
         let view = PopoverRootView(viewModel: vm)
             .environmentObject(store)
+            .environmentObject(updateAvailable)
 
         statusBar = StatusBarController(rootView: view, beforeShow: { [weak self] in
             self?.store.rolloverUnfinishedToToday()
@@ -45,36 +54,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKey = hk
     }
 
-    func openSettings() {
-        if let w = settingsWindow {
-            NSApp.activate(ignoringOtherApps: true)
-            w.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let root = SettingsView { [weak self] in
-            self?.reloadHotKey()
-        }
-
-        let hosting = NSHostingController(rootView: root)
-
-        let w = NSWindow(contentViewController: hosting)
-        w.title = "CarryOver Settings"
-        w.styleMask = [.titled, .closable]
-        w.isReleasedWhenClosed = false
-        w.setContentSize(NSSize(width: 360, height: 220))
-        w.center()
-
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: w,
-            queue: .main
-        ) { [weak self] _ in
-            self?.settingsWindow = nil
-        }
-
-        settingsWindow = w
-        NSApp.activate(ignoringOtherApps: true)
-        w.makeKeyAndOrderFront(nil)
-    }
 }

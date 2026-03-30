@@ -7,21 +7,19 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+internal import Sparkle
 
 struct PopoverRootView: View {
     @ObservedObject var viewModel: PopoverViewModel
     @EnvironmentObject var store: DailyStore
+    @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 12) {
-                PopoverHeaderView(viewModel: viewModel)
-                TaskInputView(viewModel: viewModel)
-                TaskListView(viewModel: viewModel)
-                Divider()
-                PopoverFooterView(openSettings: viewModel.openSettings)
-            }
-            .padding()
+        VStack(alignment: .leading, spacing: 12) {
+            PopoverHeaderView(viewModel: viewModel)
+            TaskInputView(viewModel: viewModel)
+            TaskListView(viewModel: viewModel)
+            Divider()
 
             if let undo = viewModel.pendingUndo {
                 UndoToastView(
@@ -29,15 +27,22 @@ struct PopoverRootView: View {
                     onUndo: { viewModel.performUndo() },
                     onDismiss: { viewModel.dismissUndo() }
                 )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 44)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
                 .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
+            } else if let version = updateAvailable.availableVersion {
+                UpdateBannerView(version: version) {
+                    updateAvailable.updater?.checkForUpdates()
+                }
+                .transition(.opacity)
             }
+
+            PopoverFooterView()
         }
         .onDrop(of: [.text], isTargeted: nil) { _ in
             viewModel.endDrag()
             return true
         }
+        .padding()
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }
         .onChange(of: viewModel.selectedDate) { _ in viewModel.handleDateChange() }

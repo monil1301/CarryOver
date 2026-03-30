@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import Sparkle
 
 @main
 struct CarryOverApp: App {
@@ -13,7 +14,7 @@ struct CarryOverApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView {
+            SettingsView(updater: appDelegate.updaterController.updater) {
                 appDelegate.reloadHotKey()
             }
         }
