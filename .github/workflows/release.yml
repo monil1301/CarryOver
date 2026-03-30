@@ -45,7 +45,6 @@ jobs:
         run: |
           set -euo pipefail
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CarryOver.app.zip
-          shasum -a 256 CarryOver.app.zip > CarryOver.app.zip.sha256
 
       - name: Sign update with Sparkle
         if: startsWith(github.ref, 'refs/tags/')
@@ -124,11 +123,20 @@ jobs:
           git commit -m "Update appcast for ${TAG}"
           git push origin gh-pages-tmp:gh-pages --force
 
+      - name: Extract release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Extract the section for this tag: everything between ## [vX.Y.Z] and the next ## [ (or EOF)
+          sed -n "/^## \\[${TAG}\\]/,/^## \\[/{/^## \\[${TAG}\\]/d;/^## \\[/d;p;}" CHANGELOG.md > /tmp/release_notes.md
+          if [ ! -s /tmp/release_notes.md ]; then
+            echo "No changelog entry found for ${TAG}" > /tmp/release_notes.md
+          fi
+
       - name: Create GitHub Release and upload assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            CarryOver.app.zip
-            CarryOver.app.zip.sha256
-          generate_release_notes: true
+          files: CarryOver.app.zip
+          body_path: /tmp/release_notes.md
