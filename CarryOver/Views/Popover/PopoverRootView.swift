@@ -15,11 +15,29 @@ struct PopoverRootView: View {
     @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PopoverHeaderView(viewModel: viewModel)
-            TaskInputView(viewModel: viewModel)
-            TaskListView(viewModel: viewModel)
-            Divider()
+        ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 12) {
+                PopoverHeaderView(viewModel: viewModel)
+                TaskInputView(viewModel: viewModel)
+
+                if viewModel.isSearchActive {
+                    SearchFieldBridge(
+                        text: $viewModel.searchQuery,
+                        focusToken: $viewModel.searchFocusToken,
+                        placeholder: "Filter tasks",
+                        onEsc: { viewModel.handleSearchEsc() },
+                        onMoveToList: { viewModel.focusList() }
+                    )
+                    .frame(height: 24)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                TaskListView(viewModel: viewModel)
+                Divider()
+                PopoverFooterView()
+            }
+            .padding()
+            .animation(.easeInOut(duration: 0.15), value: viewModel.isSearchActive)
 
             if let undo = viewModel.pendingUndo {
                 UndoToastView(
@@ -35,14 +53,11 @@ struct PopoverRootView: View {
                 }
                 .transition(.opacity)
             }
-
-            PopoverFooterView()
         }
         .onDrop(of: [.text], isTargeted: nil) { _ in
             viewModel.endDrag()
             return true
         }
-        .padding()
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }
         .onChange(of: viewModel.selectedDate) { _ in viewModel.handleDateChange() }
@@ -54,8 +69,15 @@ struct PopoverRootView: View {
             .opacity(0)
 
         ListUpArrowBridge(
-            shouldHandle: { viewModel.isToday },
+            shouldHandle: { viewModel.isToday || viewModel.isSearchActive },
             onUpArrow: { viewModel.handleUpArrow() }
+        )
+        .frame(width: 0, height: 0)
+
+        SearchKeyBridge(
+            isEditing: viewModel.isEditing,
+            isSearchActive: viewModel.isSearchActive,
+            onActivate: { viewModel.openSearch() }
         )
         .frame(width: 0, height: 0)
     }
