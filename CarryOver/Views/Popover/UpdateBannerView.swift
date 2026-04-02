@@ -21,9 +21,9 @@ struct UpdateBannerView: View {
             Button("Update") { onUpdate() }
                 .buttonStyle(.borderless)
                 .font(.callout.weight(.medium))
+                .foregroundStyle(.blue)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 }

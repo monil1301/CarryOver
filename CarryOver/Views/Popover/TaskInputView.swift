@@ -12,7 +12,7 @@ struct TaskInputView: View {
 
     var body: some View {
         if viewModel.isToday {
-            HStack(spacing: 8) {
+            VStack(spacing: 0) {
                 QuickAddTextView(
                     text: $viewModel.newText,
                     focusToken: $viewModel.focusToken,
@@ -22,11 +22,10 @@ struct TaskInputView: View {
                     onMoveToInput: { viewModel.focusInput() },
                     onMultiLinePaste: { lines in viewModel.addTasksFromPaste(lines) }
                 )
-                .frame(height: 34)
+                .frame(height: 40)
 
-                Button("Add", action: { viewModel.addTask() })
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return)
+                Divider()
+                    .padding(.top, 12)
             }
         } else {
             Text("Add new tasks on Today.")

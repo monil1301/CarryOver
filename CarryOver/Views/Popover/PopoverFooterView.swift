@@ -11,15 +11,19 @@ struct PopoverFooterView: View {
     var body: some View {
         HStack {
             SettingsLink {
-                Image(systemName: "gearshape")
-                Text("Settings")
+                HStack(spacing: 4) {
+                    Image(systemName: "gearshape")
+                    Text("Settings")
+                }
+                .foregroundStyle(.secondary)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
 
             Spacer()
 
             Button("Quit") { NSApp.terminate(nil) }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
         }
     }
 }
