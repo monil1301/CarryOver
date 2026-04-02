@@ -58,12 +58,31 @@ final class PopoverViewModel: ObservableObject {
     var titleText: String {
         if isToday { return "Today" }
         if isYesterday { return "Yesterday" }
-        return Self.prettyDate(selectedDate)
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.dateFormat = "MMM d"
+        return f.string(from: selectedDate)
     }
 
     var tasks: [TaskItem] { store.tasks(for: selectedKey) }
     var undoneTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
+
+    var dateSubtitle: String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        if isToday || isYesterday {
+            f.dateFormat = "EEEE, MMMM d"
+        } else {
+            f.dateFormat = "EEEE"
+        }
+        return f.string(from: selectedDate)
+    }
+
+    func isCarried(_ task: TaskItem) -> Bool {
+        guard isToday else { return false }
+        return !Calendar.current.isDateInToday(task.createdAt)
+    }
 
     private var storeCancellable: AnyCancellable?
 
