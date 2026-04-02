@@ -58,7 +58,10 @@ final class PopoverViewModel: ObservableObject {
     var titleText: String {
         if isToday { return "Today" }
         if isYesterday { return "Yesterday" }
-        return Self.prettyDate(selectedDate)
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.dateFormat = "MMM d"
+        return f.string(from: selectedDate)
     }
 
     var tasks: [TaskItem] { store.tasks(for: selectedKey) }
@@ -67,7 +70,12 @@ final class PopoverViewModel: ObservableObject {
 
     var dateSubtitle: String {
         let f = DateFormatter()
-        f.dateFormat = "EEEE, MMMM d"
+        f.locale = Locale.current
+        if isToday || isYesterday {
+            f.dateFormat = "EEEE, MMMM d"
+        } else {
+            f.dateFormat = "EEEE"
+        }
         return f.string(from: selectedDate)
     }
 

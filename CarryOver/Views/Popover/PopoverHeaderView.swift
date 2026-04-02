@@ -24,14 +24,17 @@ struct PopoverHeaderView: View {
                         .help("Previous day")
                         .keyboardShortcut("[", modifiers: [.command])
 
-                    Button {
-                        viewModel.selectedDate = Date()
-                        viewModel.focusToken += 1
-                    } label: {
-                        Text("Today")
+                    if !viewModel.isToday {
+                        Button {
+                            viewModel.selectedDate = Date()
+                            viewModel.focusToken += 1
+                        } label: {
+                            Text("Today")
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(minWidth: 56)
+                        .keyboardShortcut("t", modifiers: [.command])
                     }
-                    .buttonStyle(.bordered)
-                    .keyboardShortcut("t", modifiers: [.command])
 
                     Button { viewModel.shiftDay(1) } label: { Image(systemName: "chevron.right") }
                         .buttonStyle(.bordered)

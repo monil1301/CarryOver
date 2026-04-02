@@ -27,10 +27,6 @@ struct TaskInputView: View {
                 Divider()
                     .padding(.top, 12)
             }
-        } else {
-            Text("Add new tasks on Today.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 }
