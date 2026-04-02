@@ -60,12 +60,7 @@ struct QuickAddTextView: NSViewRepresentable {
         placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // Rounded border background (looks like TextField)
-        let background = NSView()
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 10
-        background.layer?.borderWidth = 1
-        background.layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
-        background.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.04).cgColor
+        let background = AdaptiveBackgroundView()
         background.translatesAutoresizingMaskIntoConstraints = false
 
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -218,5 +213,34 @@ final class CommitTextView: NSTextView {
         }
 
         super.keyDown(with: event)
+    }
+}
+
+private final class AdaptiveBackgroundView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.borderWidth = 1
+        applyColors()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
+
+    private func applyColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let isDark = self.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            self.layer?.borderColor = isDark
+                ? NSColor.white.withAlphaComponent(0.08).cgColor
+                : NSColor.black.withAlphaComponent(0.15).cgColor
+            self.layer?.backgroundColor = isDark
+                ? NSColor.white.withAlphaComponent(0.06).cgColor
+                : NSColor.black.withAlphaComponent(0.04).cgColor
+        }
     }
 }
