@@ -55,7 +55,7 @@ struct TaskListView: View {
                     }
                     .tag(PopoverViewModel.completedHeaderID)
                     .listRowSeparator(.hidden)
-                    .listRowInsets(rowInsets)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                 }
 

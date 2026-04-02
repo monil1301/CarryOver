@@ -28,7 +28,10 @@ struct PopoverRootView: View {
                 .padding(.horizontal, 16)
 
             TaskListView(viewModel: viewModel)
-//                .padding(.horizontal, 16)
+
+            Spacer(minLength: 0)
+            
+            Divider()
 
             // Fixed-height notification slot
             ZStack {
@@ -54,6 +57,8 @@ struct PopoverRootView: View {
                 Color.gray.opacity(showSlotBackground ? 0.08 : 0)
                     .animation(.easeInOut(duration: 0.2), value: showSlotBackground)
             )
+
+            Divider()
 
             PopoverFooterView()
                 .padding(.horizontal, 16)
