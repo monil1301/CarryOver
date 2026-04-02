@@ -23,7 +23,6 @@ struct UpdateBannerView: View {
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.blue)
         }
-        .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
 }
