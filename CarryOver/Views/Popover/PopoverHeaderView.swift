@@ -46,24 +46,6 @@ struct PopoverHeaderView: View {
                         .buttonStyle(.bordered)
                         .help("Pick a date")
                         .keyboardShortcut("p", modifiers: [.command])
-                        .popover(isPresented: $viewModel.showDatePicker, arrowEdge: .top) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                DatePicker(
-                                    "Date",
-                                    selection: $viewModel.selectedDate,
-                                    displayedComponents: [.date]
-                                )
-                                .datePickerStyle(.graphical)
-
-                                HStack {
-                                    Spacer()
-                                    Button("Done") { viewModel.showDatePicker = false }
-                                        .keyboardShortcut(.defaultAction)
-                                }
-                            }
-                            .padding()
-                            .frame(width: 320)
-                        }
                 }
             }
 

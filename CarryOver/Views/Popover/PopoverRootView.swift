@@ -24,10 +24,19 @@ struct PopoverRootView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 10)
 
-            TaskInputView(viewModel: viewModel)
-                .padding(.horizontal, 16)
+            if !viewModel.showDatePicker {
+                TaskInputView(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+            }
 
-            TaskListView(viewModel: viewModel)
+            if viewModel.showDatePicker {
+                InlineDatePickerView(
+                    selectedDate: $viewModel.selectedDate,
+                    onDismiss: { viewModel.showDatePicker = false }
+                )
+            } else {
+                TaskListView(viewModel: viewModel)
+            }
 
             Spacer(minLength: 0)
             
@@ -62,7 +71,7 @@ struct PopoverRootView: View {
 
             PopoverFooterView()
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.top, 10)
         }
         .onAppear { viewModel.handleAppear() }
         .onChange(of: store.resetToken) { _ in viewModel.handleReset() }
