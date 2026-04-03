@@ -41,7 +41,7 @@ struct ListReorderKeyBridge: NSViewRepresentable {
 
                 let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                     .subtracting([.numericPad, .function])
-                guard flags == .option else { return event }
+                guard flags == .command else { return event }
 
                 guard let window = self.hostView?.window, window.isKeyWindow else { return event }
                 guard let fr = window.firstResponder else { return event }

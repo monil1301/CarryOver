@@ -62,7 +62,7 @@ struct TaskRowView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            if isCarried && !task.isDone {
+            if isCarried && !task.isDone && !showDragHandle {
                 HStack(spacing: 3) {
                     Text("↩")
                     Text("carried")
