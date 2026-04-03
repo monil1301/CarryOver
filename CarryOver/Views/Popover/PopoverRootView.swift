@@ -26,21 +26,20 @@ struct PopoverRootView: View {
                 .padding(.bottom, 10)
 
             if !viewModel.showDatePicker {
-                TaskInputView(viewModel: viewModel)
+                if viewModel.isSearchActive {
+                    SearchFieldBridge(
+                        text: $viewModel.searchQuery,
+                        focusToken: $viewModel.searchFocusToken,
+                        placeholder: "Filter tasks",
+                        onEsc: { viewModel.handleSearchEsc() },
+                        onMoveToList: { viewModel.focusList() }
+                    )
+                    .frame(height: 40)
                     .padding(.horizontal, 16)
-            }
-
-            if viewModel.isSearchActive {
-                SearchFieldBridge(
-                    text: $viewModel.searchQuery,
-                    focusToken: $viewModel.searchFocusToken,
-                    placeholder: "Filter tasks",
-                    onEsc: { viewModel.handleSearchEsc() },
-                    onMoveToList: { viewModel.focusList() }
-                )
-                .frame(height: 24)
-                .padding(.horizontal, 16)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    TaskInputView(viewModel: viewModel)
+                        .padding(.horizontal, 16)
+                }
             }
 
             if viewModel.showDatePicker {

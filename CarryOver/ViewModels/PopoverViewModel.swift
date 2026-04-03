@@ -44,6 +44,12 @@ final class PopoverViewModel: ObservableObject {
     var dragSnapshot: DayBucket?
     var isCompletedHeaderSelected: Bool { selection == Self.completedHeaderID }
 
+    // Search state
+    var isSearchActive: Bool = false { didSet { sendChange() } }
+    var searchQuery: String = "" { didSet { sendChange() } }
+    var searchFocusToken: Int = 0 { didSet { sendChange() } }
+    private var searchSessionPinnedIDs: Set<UUID> = []
+
     var pendingUndo: UndoAction? { didSet { sendChange() } }
     private var undoTimer: DispatchWorkItem?
 
@@ -84,6 +90,15 @@ final class PopoverViewModel: ObservableObject {
     func isCarried(_ task: TaskItem) -> Bool {
         guard isToday else { return false }
         return !Calendar.current.isDateInToday(task.createdAt)
+    }
+
+    var searchResults: [TaskItem] {
+        let q = searchQuery.lowercased().trimmingCharacters(in: .whitespaces)
+        return tasks.filter { task in
+            searchSessionPinnedIDs.contains(task.id) ||
+            q.isEmpty ||
+            task.text.lowercased().contains(q)
+        }
     }
 
     private var storeCancellable: AnyCancellable?
@@ -153,6 +168,7 @@ final class PopoverViewModel: ObservableObject {
 
     func shiftDay(_ delta: Int) {
         if isEditing { cancelEdit() }
+        if isSearchActive { closeSearch() }
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {
             selectedDate = d
         }
@@ -166,6 +182,7 @@ final class PopoverViewModel: ObservableObject {
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
         }
         store.toggleDone(dayKey: key, taskID: taskID)
+        pinTaskInSearch(taskID)
     }
 
     func toggleSelectedDone() -> Bool {
@@ -196,6 +213,7 @@ final class PopoverViewModel: ObservableObject {
         }
 
         store.updateTaskText(dayKey: key, taskID: taskID, text: editText)
+        pinTaskInSearch(taskID)
         editingTaskID = nil
         editText = ""
         focusListToken += 1
@@ -212,8 +230,10 @@ final class PopoverViewModel: ObservableObject {
     func deleteSelected() {
         guard let id = selection, !isCompletedHeaderSelected else { return }
         let key = selectedKey
-        let tasksBefore = store.tasks(for: key)
-        let idx = tasksBefore.firstIndex(where: { $0.id == id })
+
+        // Capture index before delete for selection logic
+        let listBeforeDelete: [TaskItem] = isSearchActive ? searchResults : store.tasks(for: key)
+        let idx = listBeforeDelete.firstIndex(where: { $0.id == id })
 
         if let bucket = store.days[key],
            let task = bucket.tasks.first(where: { $0.id == id }) {
@@ -221,15 +241,26 @@ final class PopoverViewModel: ObservableObject {
         }
 
         store.deleteTask(dayKey: key, taskID: id)
+        searchSessionPinnedIDs.remove(id)
 
-        let tasksAfter = store.tasks(for: key)
-        if let idx, !tasksAfter.isEmpty {
-            selection = tasksAfter[min(idx, tasksAfter.count - 1)].id
+        if isSearchActive {
+            let resultsAfter = searchResults
+            if let idx, !resultsAfter.isEmpty {
+                selection = resultsAfter[min(idx, resultsAfter.count - 1)].id
+                focusListToken += 1
+            } else {
+                selection = nil
+                searchFocusToken += 1
+            }
         } else {
-            selection = tasksAfter.first?.id
+            let tasksAfter = store.tasks(for: key)
+            if let idx, !tasksAfter.isEmpty {
+                selection = tasksAfter[min(idx, tasksAfter.count - 1)].id
+            } else {
+                selection = tasksAfter.first?.id
+            }
+            if isToday { focusToken += 1 } else { focusListToken += 1 }
         }
-
-        if isToday { focusToken += 1 } else { focusListToken += 1 }
     }
 
     func deleteTask(taskID: UUID) {
@@ -239,10 +270,11 @@ final class PopoverViewModel: ObservableObject {
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
         }
         store.deleteTask(dayKey: key, taskID: taskID)
+        searchSessionPinnedIDs.remove(taskID)
     }
 
     func moveSelectedTask(direction: Int) -> Bool {
-        guard isToday, !isEditing,
+        guard isToday, !isEditing, !isSearchActive,
               let id = selection, !isCompletedHeaderSelected,
               let task = undoneTasks.first(where: { $0.id == id }),
               !task.isDone else { return false }
@@ -260,7 +292,7 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func reorderUndoneTasks(fromOffsets: IndexSet, toOffset: Int) {
-        guard isToday, !isEditing else { return }
+        guard isToday, !isEditing, !isSearchActive else { return }
         let key = selectedKey
         store.reorderUndoneTasks(dayKey: key, fromOffsets: fromOffsets, toOffset: toOffset)
     }
@@ -289,7 +321,7 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func focusList() {
-        selection = tasks.first?.id
+        selection = (isSearchActive ? searchResults : tasks).first?.id
         focusListToken += 1
     }
 
@@ -299,6 +331,7 @@ final class PopoverViewModel: ObservableObject {
 
     func handleReset() {
         if isEditing { cancelEdit() }
+        if isSearchActive { closeSearch() }
         selectedDate = Date()
         selection = nil
         focusToken += 1
@@ -306,16 +339,27 @@ final class PopoverViewModel: ObservableObject {
 
     func handleDateChange() {
         if isEditing { cancelEdit() }
+        if isSearchActive { closeSearch() }
         selection = nil
         if isToday { focusToken += 1 } else { focusList() }
     }
 
     func handleAppear() {
         if isEditing { cancelEdit() }
+        if isSearchActive { closeSearch() }
         if isToday { focusToken += 1 } else { focusList() }
     }
 
     func handleUpArrow() -> Bool {
+        if isSearchActive {
+            let firstID = searchResults.first?.id
+            if selection == nil || selection == firstID {
+                selection = nil
+                searchFocusToken += 1
+                return true
+            }
+            return false
+        }
         guard let firstID = tasks.first?.id else { return false }
         if selection == nil || selection == firstID {
             selection = nil
@@ -330,6 +374,50 @@ final class PopoverViewModel: ObservableObject {
         DispatchQueue.main.async { [self] in
             focusListToken += 1
         }
+    }
+
+    // MARK: - Search
+
+    func openSearch() {
+        guard !isSearchActive else { return }
+        if isEditing { cancelEdit() }
+        isSearchActive = true
+        searchQuery = ""
+        searchSessionPinnedIDs = []
+        selection = nil
+        searchFocusToken += 1
+    }
+
+    func closeSearch() {
+        guard isSearchActive else { return }
+        isSearchActive = false
+        searchQuery = ""
+        searchSessionPinnedIDs = []
+        // Keep current selection if valid, otherwise clear
+        if let sel = selection, tasks.contains(where: { $0.id == sel }) {
+            focusListToken += 1
+        } else {
+            selection = nil
+            if isToday { focusToken += 1 } else { focusList() }
+        }
+    }
+
+    func handleSearchEsc() {
+        if !searchQuery.isEmpty {
+            searchQuery = ""
+        } else {
+            closeSearch()
+        }
+    }
+
+    private func pinTaskInSearch(_ id: UUID) {
+        if isSearchActive {
+            searchSessionPinnedIDs.insert(id)
+        }
+    }
+
+    func focusSearchField() {
+        searchFocusToken += 1
     }
 
     // MARK: - Undo

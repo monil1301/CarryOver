@@ -121,6 +121,15 @@ final class DailyStore: ObservableObject {
     func dayKey(for date: Date) -> String { df.string(from: date) }
 
     func date(fromKey key: String) -> Date? { df.date(from: key) }
+    
+    func note(for dayKey: String) -> String {
+        days[dayKey]?.note ?? ""
+    }
+
+    func setNote(dayKey: String, text: String) {
+        days[dayKey, default: DayBucket()].note = text
+        save()
+    }
 
     var availableDayKeysSortedDesc: [String] {
         days.keys.sorted(by: >)  // newest first

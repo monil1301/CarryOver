@@ -13,6 +13,7 @@ struct TaskRowView: View {
     var isSelected: Bool = false
     var isToday: Bool = false
     var isCarried: Bool = false
+    var isReorderable: Bool = true
     @Binding var editText: String
     let onToggle: () -> Void
     let onEdit: () -> Void
@@ -25,7 +26,7 @@ struct TaskRowView: View {
     @State private var isHovered = false
 
     private var showDragHandle: Bool {
-        isToday && !task.isDone && !isEditing && (isHovered || isSelected)
+        isReorderable && isToday && !task.isDone && !isEditing && (isHovered || isSelected)
     }
 
     var body: some View {
