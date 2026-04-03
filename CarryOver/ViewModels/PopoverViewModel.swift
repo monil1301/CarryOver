@@ -50,6 +50,9 @@ final class PopoverViewModel: ObservableObject {
     var searchFocusToken: Int = 0 { didSet { sendChange() } }
     private var searchSessionPinnedIDs: Set<UUID> = []
 
+    // Cheat sheet state
+    var isCheatSheetOpen: Bool = false { didSet { sendChange() } }
+
     var pendingUndo: UndoAction? { didSet { sendChange() } }
     private var undoTimer: DispatchWorkItem?
 
@@ -377,6 +380,9 @@ final class PopoverViewModel: ObservableObject {
     }
 
     // MARK: - Search
+
+    func toggleCheatSheet() { isCheatSheetOpen.toggle() }
+    func closeCheatSheet() { isCheatSheetOpen = false }
 
     func openSearch() {
         guard !isSearchActive else { return }

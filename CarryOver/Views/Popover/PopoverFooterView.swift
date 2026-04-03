@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct PopoverFooterView: View {
+    var onShortcutsHelp: (() -> Void)?
+
     var body: some View {
         HStack {
             SettingsLink {
@@ -20,6 +22,13 @@ struct PopoverFooterView: View {
             .buttonStyle(.plain)
 
             Spacer()
+
+            Button { onShortcutsHelp?() } label: {
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Keyboard shortcuts")
 
             Button("Quit") { NSApp.terminate(nil) }
                 .buttonStyle(.plain)
