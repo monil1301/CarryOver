@@ -154,7 +154,7 @@ struct TaskListView: View {
             if viewModel.isToday {
                 Divider()
                     .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 8, leading: -16, bottom: 8, trailing: -16))
 
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.right")
