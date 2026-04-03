@@ -11,6 +11,8 @@ import UniformTypeIdentifiers
 struct TaskListView: View {
     @ObservedObject var viewModel: PopoverViewModel
 
+    private let rowInsets = EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)
+
     var body: some View {
         List(selection: $viewModel.selection) {
             ForEach(viewModel.undoneTasks) { task in
@@ -19,6 +21,7 @@ struct TaskListView: View {
                     isEditing: viewModel.editingTaskID == task.id,
                     isSelected: viewModel.selection == task.id,
                     isToday: viewModel.isToday,
+                    isCarried: viewModel.isCarried(task),
                     editText: $viewModel.editText,
                     onToggle: { viewModel.toggleDone(taskID: task.id) },
                     onEdit: { viewModel.startEditing(taskID: task.id) },
@@ -50,28 +53,35 @@ struct TaskListView: View {
                     targetTaskID: task.id,
                     viewModel: viewModel
                 ))
+                .listRowSeparator(.hidden)
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
             }
 
             if !viewModel.doneTasks.isEmpty {
                 if viewModel.isToday {
                     Divider()
                         .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: -16, bottom: 8, trailing: -16))
 
                     HStack(spacing: 4) {
-                        Image(systemName: "chevron.right")
-                            .rotationEffect(.degrees(viewModel.isCompletedCollapsed ? 0 : 90))
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(viewModel.isCompletedCollapsed ? -90 : 0))
                             .font(.caption2)
                         Text("Completed (\(viewModel.doneTasks.count))")
                     }
                     .foregroundStyle(.secondary)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 12, weight: .medium))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         viewModel.selection = PopoverViewModel.completedHeaderID
                         withAnimation { viewModel.toggleCompletedCollapse() }
                     }
                     .tag(PopoverViewModel.completedHeaderID)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                    .listRowBackground(Color.clear)
                 }
 
                 if !viewModel.isToday || !viewModel.isCompletedCollapsed {
@@ -81,6 +91,7 @@ struct TaskListView: View {
                             isEditing: viewModel.editingTaskID == task.id,
                             isSelected: viewModel.selection == task.id,
                             isToday: viewModel.isToday,
+                            isCarried: viewModel.isCarried(task),
                             editText: $viewModel.editText,
                             onToggle: { viewModel.toggleDone(taskID: task.id) },
                             onEdit: { viewModel.startEditing(taskID: task.id) },
@@ -90,6 +101,9 @@ struct TaskListView: View {
                             onSelect: { viewModel.selectTask(task.id) }
                         )
                         .tag(task.id)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(rowInsets)
+                        .listRowBackground(Color.clear)
                     }
                 }
             }
@@ -97,9 +111,14 @@ struct TaskListView: View {
             if viewModel.tasks.isEmpty {
                 Text("No tasks for this day.")
                     .foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(rowInsets)
+                    .listRowBackground(Color.clear)
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .environment(\.defaultMinListRowHeight, 10)
         .onDeleteCommand {
             viewModel.deleteSelected()
         }

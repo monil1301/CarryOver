@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.3.0]
+
+- Popup UI revamp
+- Settings screen revamp
+- Minor fixes
+
 ## [v1.2.0]
 
 - Fixed settings disappear issue

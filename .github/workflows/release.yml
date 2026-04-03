@@ -123,15 +123,19 @@ jobs:
           </rss>
           EOF
 
-          # Push appcast.xml to gh-pages branch
+          # Push gh-pages branch with appcast, landing page, and mockup
           cp appcast.xml /tmp/appcast.xml
+          cp index.html /tmp/index.html
+          cp mockup.png /tmp/mockup.png
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan gh-pages-tmp
           git rm -rf . > /dev/null 2>&1 || true
           cp /tmp/appcast.xml appcast.xml
-          git add appcast.xml
-          git commit -m "Update appcast for ${TAG}"
+          cp /tmp/index.html index.html
+          cp /tmp/mockup.png mockup.png
+          git add appcast.xml index.html mockup.png
+          git commit -m "Update appcast and landing page for ${TAG}"
           git push origin gh-pages-tmp:gh-pages --force
 
       - name: Create GitHub Release and upload assets

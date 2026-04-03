@@ -14,46 +14,80 @@ struct PopoverRootView: View {
     @EnvironmentObject var store: DailyStore
     @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
+    private var showUndo: Bool { viewModel.pendingUndo != nil }
+    private var showUpdate: Bool { !showUndo && updateAvailable.availableVersion != nil }
+    private var showSlotBackground: Bool { showUndo || showUpdate }
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 12) {
-                PopoverHeaderView(viewModel: viewModel)
+        VStack(alignment: .leading, spacing: 0) {
+            PopoverHeaderView(viewModel: viewModel)
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+
+            if !viewModel.showDatePicker {
                 TaskInputView(viewModel: viewModel)
-
-                if viewModel.isSearchActive {
-                    SearchFieldBridge(
-                        text: $viewModel.searchQuery,
-                        focusToken: $viewModel.searchFocusToken,
-                        placeholder: "Filter tasks",
-                        onEsc: { viewModel.handleSearchEsc() },
-                        onMoveToList: { viewModel.focusList() }
-                    )
-                    .frame(height: 24)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                TaskListView(viewModel: viewModel)
-                Divider()
-                PopoverFooterView()
+                    .padding(.horizontal, 16)
             }
-            .padding()
-            .animation(.easeInOut(duration: 0.15), value: viewModel.isSearchActive)
 
-            if let undo = viewModel.pendingUndo {
-                UndoToastView(
-                    label: undo.label,
-                    onUndo: { viewModel.performUndo() },
-                    onDismiss: { viewModel.dismissUndo() }
+            if viewModel.isSearchActive {
+                SearchFieldBridge(
+                    text: $viewModel.searchQuery,
+                    focusToken: $viewModel.searchFocusToken,
+                    placeholder: "Filter tasks",
+                    onEsc: { viewModel.handleSearchEsc() },
+                    onMoveToList: { viewModel.focusList() }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
-            } else if let version = updateAvailable.availableVersion {
-                UpdateBannerView(version: version) {
-                    updateAvailable.updater?.checkForUpdates()
-                }
-                .transition(.opacity)
+                .frame(height: 24)
+                .padding(.horizontal, 16)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            if viewModel.showDatePicker {
+                InlineDatePickerView(
+                    selectedDate: $viewModel.selectedDate,
+                    onDismiss: { viewModel.showDatePicker = false }
+                )
+            } else {
+                TaskListView(viewModel: viewModel)
+            }
+
+            Spacer(minLength: 0)
+
+            Divider()
+
+            // Fixed-height notification slot
+            ZStack {
+                if let undo = viewModel.pendingUndo {
+                    UndoToastView(
+                        label: undo.label,
+                        onUndo: { viewModel.performUndo() },
+                        onDismiss: { viewModel.dismissUndo() }
+                    )
+                }
+
+                if let version = updateAvailable.availableVersion {
+                    UpdateBannerView(version: version) {
+                        updateAvailable.updater?.checkForUpdates()
+                    }
+                    .opacity(showUpdate ? 1 : 0)
+                }
+            }
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .background(
+                Color.gray.opacity(showSlotBackground ? 0.08 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: showSlotBackground)
+            )
+
+            Divider()
+
+            PopoverFooterView()
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
         }
+        .animation(.easeInOut(duration: 0.15), value: viewModel.isSearchActive)
         .onDrop(of: [.text], isTargeted: nil) { _ in
             viewModel.endDrag()
             return true

@@ -42,8 +42,6 @@ struct UndoToastView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .transition(.move(edge: .bottom).combined(with: .opacity))
         .onAppear {
             progress = 1.0
             withAnimation(.linear(duration: duration)) {
