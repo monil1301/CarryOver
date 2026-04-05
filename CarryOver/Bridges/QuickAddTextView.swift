@@ -16,6 +16,7 @@ struct QuickAddTextView: NSViewRepresentable {
     var onMoveToList: () -> Void
     var onMoveToInput: () -> Void
     var onMultiLinePaste: ([String]) -> Void
+    var onDragEndedOverInput: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -36,6 +37,7 @@ struct QuickAddTextView: NSViewRepresentable {
         textView.onMoveToList = onMoveToList
         textView.onMoveToInput = onMoveToInput
         textView.onMultiLinePaste = onMultiLinePaste
+        textView.onDragEndedOverInput = onDragEndedOverInput
 
         textView.isRichText = false
         textView.importsGraphics = false
@@ -166,6 +168,24 @@ final class CommitTextView: NSTextView {
     var onMoveToList: (() -> Void)?
     var onMoveToInput: (() -> Void)?
     var onMultiLinePaste: (([String]) -> Void)?
+
+    // Reject task reorder drags — accept the drop to prevent UUID text insertion,
+    // but discard the content and notify parent to clear drag state.
+    var onDragEndedOverInput: (() -> Void)?
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation { .move }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool { true }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        onDragEndedOverInput?()
+        return true  // Consume the drop so NSTextView doesn't insert text
+    }
+
+    // Prevent NSTextView's default drop behavior from inserting text
+    override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        false
+    }
 
     override func paste(_ sender: Any?) {
         guard let raw = NSPasteboard.general.string(forType: .string) else {

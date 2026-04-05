@@ -121,6 +121,15 @@ final class DailyStore: ObservableObject {
     func dayKey(for date: Date) -> String { df.string(from: date) }
 
     func date(fromKey key: String) -> Date? { df.date(from: key) }
+    
+    func note(for dayKey: String) -> String {
+        days[dayKey]?.note ?? ""
+    }
+
+    func setNote(dayKey: String, text: String) {
+        days[dayKey, default: DayBucket()].note = text
+        save()
+    }
 
     var availableDayKeysSortedDesc: [String] {
         days.keys.sorted(by: >)  // newest first
@@ -147,6 +156,30 @@ final class DailyStore: ObservableObject {
     func deleteTask(dayKey: String, taskID: UUID) {
         guard var bucket = days[dayKey] else { return }
         bucket.tasks.removeAll { $0.id == taskID }
+        days[dayKey] = bucket
+        save()
+    }
+
+    func moveTask(dayKey: String, taskID: UUID, direction: Int) {
+        guard var bucket = days[dayKey],
+              let idx = bucket.tasks.firstIndex(where: { $0.id == taskID }),
+              !bucket.tasks[idx].isDone else { return }
+
+        let undoneCount = bucket.tasks.prefix(while: { !$0.isDone }).count
+        let newIdx = idx + direction
+        guard newIdx >= 0, newIdx < undoneCount else { return }
+
+        bucket.tasks.swapAt(idx, newIdx)
+        days[dayKey] = bucket
+        save()
+    }
+
+    func reorderUndoneTasks(dayKey: String, fromOffsets: IndexSet, toOffset: Int) {
+        guard var bucket = days[dayKey] else { return }
+        var undone = bucket.tasks.filter { !$0.isDone }
+        let done = bucket.tasks.filter { $0.isDone }
+        undone.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        bucket.tasks = undone + done
         days[dayKey] = bucket
         save()
     }

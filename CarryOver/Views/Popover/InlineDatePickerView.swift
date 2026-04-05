@@ -64,7 +64,6 @@ struct InlineDatePickerView: View {
         .onAppear {
             displayedMonth = calendar.startOfMonth(for: selectedDate)
         }
-        .onExitCommand { onDismiss() }
     }
 
     // MARK: - Date Cell

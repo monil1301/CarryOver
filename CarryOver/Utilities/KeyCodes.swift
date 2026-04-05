@@ -17,4 +17,6 @@ enum KeyCode {
     static let upArrow:       UInt16 = 126
     static let leftArrow:     UInt16 = 123
     static let rightArrow:    UInt16 = 124
+    static let slash:         UInt16 = 44
+    static let f:             UInt16 = 3
 }

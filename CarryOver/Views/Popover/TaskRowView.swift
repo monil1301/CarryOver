@@ -10,7 +10,10 @@ import SwiftUI
 struct TaskRowView: View {
     let task: TaskItem
     var isEditing: Bool = false
+    var isSelected: Bool = false
+    var isToday: Bool = false
     var isCarried: Bool = false
+    var isReorderable: Bool = true
     @Binding var editText: String
     let onToggle: () -> Void
     let onEdit: () -> Void
@@ -20,7 +23,11 @@ struct TaskRowView: View {
     let onSelect: () -> Void
 
     @FocusState private var fieldFocused: Bool
-    @State private var isHovered: Bool = false
+    @State private var isHovered = false
+
+    private var showDragHandle: Bool {
+        isReorderable && isToday && !task.isDone && !isEditing && (isHovered || isSelected)
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -49,7 +56,14 @@ struct TaskRowView: View {
 
             Spacer()
 
-            if isCarried && !task.isDone {
+            if showDragHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 6)
+            }
+
+            if isCarried && !task.isDone && !showDragHandle {
                 HStack(spacing: 3) {
                     Text("↩")
                     Text("carried")
@@ -70,6 +84,7 @@ struct TaskRowView: View {
         .onHover { isHovered = $0 }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
+        .onHover { isHovered = $0 }
         .contextMenu {
             Button("Edit") { onEdit() }
             Button("Delete") { onDelete() }
