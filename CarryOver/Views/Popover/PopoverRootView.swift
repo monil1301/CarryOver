@@ -129,7 +129,8 @@ struct PopoverRootView: View {
         SearchKeyBridge(
             isEditing: viewModel.isEditing,
             isSearchActive: viewModel.isSearchActive,
-            onActivate: { viewModel.openSearch() }
+            onActivate: { viewModel.openSearch() },
+            onClose: { viewModel.closeSearch() }
         )
         .frame(width: 0, height: 0)
 

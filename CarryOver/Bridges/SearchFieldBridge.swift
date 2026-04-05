@@ -47,8 +47,14 @@ struct SearchFieldBridge: NSViewRepresentable {
         ])
 
         context.coordinator.field = field
+        context.coordinator.lastFocusToken = focusToken
         context.coordinator.onEsc = onEsc
         context.coordinator.onMoveToList = onMoveToList
+
+        // Auto-focus when the field first appears
+        DispatchQueue.main.async {
+            field.window?.makeFirstResponder(field)
+        }
 
         return container
     }

@@ -10,6 +10,7 @@ struct SearchKeyBridge: NSViewRepresentable {
     var isEditing: Bool
     var isSearchActive: Bool
     var onActivate: () -> Void
+    var onClose: () -> Void
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
@@ -18,6 +19,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.isEditing = isEditing
         context.coordinator.isSearchActive = isSearchActive
         context.coordinator.onActivate = onActivate
+        context.coordinator.onClose = onClose
         return v
     }
 
@@ -26,6 +28,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.isEditing = isEditing
         context.coordinator.isSearchActive = isSearchActive
         context.coordinator.onActivate = onActivate
+        context.coordinator.onClose = onClose
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -35,6 +38,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         var isEditing: Bool = false
         var isSearchActive: Bool = false
         var onActivate: (() -> Void)?
+        var onClose: (() -> Void)?
 
         private var monitor: Any?
 
@@ -42,8 +46,15 @@ struct SearchKeyBridge: NSViewRepresentable {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self else { return event }
-                guard !self.isSearchActive else { return event }
                 guard let window = self.hostView?.window, window.isKeyWindow else { return event }
+
+                // Esc closes search when active (from any focus)
+                if self.isSearchActive && event.keyCode == KeyCode.escape {
+                    self.onClose?()
+                    return nil
+                }
+
+                guard !self.isSearchActive else { return event }
 
                 // Cmd+F
                 let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)

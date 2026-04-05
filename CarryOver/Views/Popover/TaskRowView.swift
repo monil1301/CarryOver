@@ -60,6 +60,7 @@ struct TaskRowView: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 6)
             }
 
             if isCarried && !task.isDone && !showDragHandle {
