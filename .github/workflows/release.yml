@@ -96,6 +96,7 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
+          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Contents/Info.plist")
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/CarryOver.app.zip"
           PUB_DATE=$(date -R)
 
@@ -110,7 +111,7 @@ jobs:
               <item>
                 <title>Version ${VERSION}</title>
                 <pubDate>${PUB_DATE}</pubDate>
-                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:version>${BUILD_NUMBER}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <enclosure
                   url="${DOWNLOAD_URL}"
