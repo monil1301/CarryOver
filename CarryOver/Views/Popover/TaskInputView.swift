@@ -20,7 +20,8 @@ struct TaskInputView: View {
                     onCommit: { viewModel.addTask() },
                     onMoveToList: { viewModel.focusList() },
                     onMoveToInput: { viewModel.focusInput() },
-                    onMultiLinePaste: { lines in viewModel.addTasksFromPaste(lines) }
+                    onMultiLinePaste: { lines in viewModel.addTasksFromPaste(lines) },
+                    onDragEndedOverInput: { viewModel.endDrag() }
                 )
                 .frame(height: 40)
 
