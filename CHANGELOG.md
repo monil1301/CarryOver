@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.4.0]
+
+- Added ability to Search tasks
+- Support to Reorder tasks
+- In app Keyboard Shortcuts sheet
+
 ## [v1.3.0]
 
 - Popup UI revamp
