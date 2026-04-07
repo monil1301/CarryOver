@@ -119,6 +119,7 @@ final class PopoverViewModel: ObservableObject {
         store.addTaskToday(newText)
         newText = ""
         focusToken += 1
+        Analytics.send("task.added")
     }
 
     func addTasksFromPaste(_ texts: [String]) {
@@ -139,6 +140,7 @@ final class PopoverViewModel: ObservableObject {
 
         newText = ""
         focusToken += 1
+        Analytics.send("pasteAsTasks.used")
     }
 
     static func parsePastedTasks(_ text: String) -> [String] {
@@ -175,6 +177,7 @@ final class PopoverViewModel: ObservableObject {
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {
             selectedDate = d
         }
+        if delta < 0 { Analytics.send("dayNavigator.previousDay") }
     }
 
     func toggleDone(taskID: UUID) {
@@ -183,6 +186,7 @@ final class PopoverViewModel: ObservableObject {
            let task = bucket.tasks.first(where: { $0.id == taskID }) {
             let label = task.isDone ? "Unmarked '\(task.text)'" : "Completed '\(task.text)'"
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
+            if !task.isDone { Analytics.send("task.completed") }
         }
         store.toggleDone(dayKey: key, taskID: taskID)
         pinTaskInSearch(taskID)
@@ -220,6 +224,7 @@ final class PopoverViewModel: ObservableObject {
         editingTaskID = nil
         editText = ""
         focusListToken += 1
+        Analytics.send("task.edited")
     }
 
     func cancelEdit() {
@@ -245,6 +250,7 @@ final class PopoverViewModel: ObservableObject {
 
         store.deleteTask(dayKey: key, taskID: id)
         searchSessionPinnedIDs.remove(id)
+        Analytics.send("task.deleted")
 
         if isSearchActive {
             let resultsAfter = searchResults
@@ -274,6 +280,7 @@ final class PopoverViewModel: ObservableObject {
         }
         store.deleteTask(dayKey: key, taskID: taskID)
         searchSessionPinnedIDs.remove(taskID)
+        Analytics.send("task.deleted")
     }
 
     func moveSelectedTask(direction: Int) -> Bool {
@@ -321,6 +328,7 @@ final class PopoverViewModel: ObservableObject {
 
     func toggleCompletedCollapse() {
         isCompletedCollapsed.toggle()
+        Analytics.send(isCompletedCollapsed ? "completedSection.collapsed" : "completedSection.expanded")
     }
 
     func focusList() {
@@ -381,7 +389,10 @@ final class PopoverViewModel: ObservableObject {
 
     // MARK: - Search
 
-    func toggleCheatSheet() { isCheatSheetOpen.toggle() }
+    func toggleCheatSheet() {
+        isCheatSheetOpen.toggle()
+        if isCheatSheetOpen { Analytics.send("shortcuts.cheatSheetOpened") }
+    }
     func closeCheatSheet() { isCheatSheetOpen = false }
 
     func openSearch() {
@@ -445,6 +456,7 @@ final class PopoverViewModel: ObservableObject {
             selection = sel
         }
         dismissUndo()
+        Analytics.send("undo.triggered")
     }
 
     func dismissUndo() {

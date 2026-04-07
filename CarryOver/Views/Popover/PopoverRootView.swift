@@ -79,9 +79,11 @@ struct PopoverRootView: View {
 
                         if let state = updateAvailable.state {
                             UpdateBannerView(state: state) {
+                                Analytics.send("update.started")
                                 selfUpdater.startUpdate()
                             }
                             .opacity(showUpdate ? 1 : 0)
+                            .onAppear { Analytics.send("update.banner.shown") }
                         }
                     }
                     .frame(height: 38)

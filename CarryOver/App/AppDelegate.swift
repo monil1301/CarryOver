@@ -20,6 +20,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyService.registerDefaults()
         store.load()
 
+        Analytics.initialize()
+        Analytics.send("app.launched")
+
+        let carriedCount = store.rolloverUnfinishedToToday()
+        if carriedCount > 0 {
+            Analytics.send("task.carriedOver", with: ["count": "\(carriedCount)"])
+        }
+
         selfUpdater.startAutoChecks()
 
         let vm = PopoverViewModel(store: store)
