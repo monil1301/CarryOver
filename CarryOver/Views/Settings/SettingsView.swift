@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-internal import Sparkle
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
@@ -33,7 +32,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    let updater: SPUUpdater
+    let selfUpdater: SelfUpdater
     let onChange: () -> Void
 
     @State private var selectedTab: SettingsTab = .general
@@ -57,7 +56,7 @@ struct SettingsView: View {
             Group {
                 switch selectedTab {
                 case .general:
-                    GeneralSettingsTab(updater: updater)
+                    GeneralSettingsTab(selfUpdater: selfUpdater)
                 case .hotkey:
                     HotkeySettingsTab(onChange: onChange)
                 }

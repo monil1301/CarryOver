@@ -6,7 +6,6 @@
 import AppKit
 import SwiftUI
 import HotKey
-internal import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
@@ -15,25 +14,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
 
     let updateAvailable = UpdateAvailableViewModel()
-    private(set) lazy var updaterDelegate: UpdaterDelegate = UpdaterDelegate(updateAvailable: updateAvailable)
-    private(set) lazy var updaterController: SPUStandardUpdaterController = {
-        let controller = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: updaterDelegate, userDriverDelegate: updaterDelegate
-        )
-        updateAvailable.updater = controller.updater
-        return controller
-    }()
+    private(set) lazy var selfUpdater = SelfUpdater(viewModel: updateAvailable)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         HotkeyService.registerDefaults()
         store.load()
 
-        _ = updaterController // ensure initialized
+        selfUpdater.startAutoChecks()
 
         let vm = PopoverViewModel(store: store)
         viewModel = vm
 
-        let view = PopoverRootView(viewModel: vm)
+        let view = PopoverRootView(viewModel: vm, selfUpdater: selfUpdater)
             .environmentObject(store)
             .environmentObject(updateAvailable)
 

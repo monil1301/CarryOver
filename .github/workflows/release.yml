@@ -46,37 +46,6 @@ jobs:
           set -euo pipefail
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CarryOver.app.zip
 
-      - name: Sign update with Sparkle
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          SIGN_TOOL="spm/artifacts/sparkle/Sparkle/bin/sign_update"
-          chmod +x "$SIGN_TOOL"
-          KEY_FILE=$(mktemp)
-          echo -n "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
-          SIGN_OUTPUT=$("$SIGN_TOOL" CarryOver.app.zip -f "$KEY_FILE" 2>&1) || true
-          rm -f "$KEY_FILE"
-          echo "sign_update output: $SIGN_OUTPUT"
-
-          # Try sparkle:edSignature="..." format first
-          if echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
-            SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
-          else
-            # Older versions output just the raw signature string
-            SIGNATURE=$(echo "$SIGN_OUTPUT" | head -1)
-          fi
-
-          if [ -z "$SIGNATURE" ]; then
-            echo "::error::Failed to extract signature from sign_update output"
-            exit 1
-          fi
-
-          LENGTH=$(stat -f%z CarryOver.app.zip)
-          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
-          echo "SPARKLE_LENGTH=$LENGTH" >> $GITHUB_ENV
-
       - name: Extract release notes from CHANGELOG
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -102,7 +71,7 @@ jobs:
 
           cat > appcast.xml << EOF
           <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
             <channel>
               <title>CarryOver Updates</title>
               <link>https://monil1301.github.io/CarryOver/appcast.xml</link>
@@ -115,8 +84,6 @@ jobs:
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <enclosure
                   url="${DOWNLOAD_URL}"
-                  sparkle:edSignature="${SPARKLE_SIGNATURE}"
-                  length="${SPARKLE_LENGTH}"
                   type="application/octet-stream"
                 />
               </item>

@@ -7,16 +7,21 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
-internal import Sparkle
 
 struct PopoverRootView: View {
     @ObservedObject var viewModel: PopoverViewModel
     @EnvironmentObject var store: DailyStore
     @EnvironmentObject var updateAvailable: UpdateAvailableViewModel
 
+    init(viewModel: PopoverViewModel, selfUpdater: SelfUpdater) {
+        self.viewModel = viewModel
+        self.selfUpdater = selfUpdater
+    }
+
     private var showUndo: Bool { viewModel.pendingUndo != nil }
-    private var showUpdate: Bool { !showUndo && updateAvailable.availableVersion != nil }
+    private var showUpdate: Bool { !showUndo && updateAvailable.state != nil }
     private var showSlotBackground: Bool { showUndo || showUpdate }
+    private let selfUpdater: SelfUpdater
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -72,9 +77,9 @@ struct PopoverRootView: View {
                             )
                         }
 
-                        if let version = updateAvailable.availableVersion {
-                            UpdateBannerView(version: version) {
-                                updateAvailable.updater?.checkForUpdates()
+                        if let state = updateAvailable.state {
+                            UpdateBannerView(state: state) {
+                                selfUpdater.startUpdate()
                             }
                             .opacity(showUpdate ? 1 : 0)
                         }
