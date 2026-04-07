@@ -39,7 +39,6 @@ final class DailyStore: ObservableObject {
         } catch {
             days = [:]
         }
-        rolloverUnfinishedToToday()
     }
 
     func save() {
@@ -96,7 +95,8 @@ final class DailyStore: ObservableObject {
     }
 
     /// Core feature: unfinished tasks from older days move into today; done tasks stay on their day.
-    func rolloverUnfinishedToToday() {
+    @discardableResult
+    func rolloverUnfinishedToToday() -> Int {
         let today = todayKey
         var incoming: [TaskItem] = []
 
@@ -116,6 +116,7 @@ final class DailyStore: ObservableObject {
 
         normalizeOrder(dayKey: today)
         save()
+        return incoming.count
     }
     
     func dayKey(for date: Date) -> String { df.string(from: date) }

@@ -64,6 +64,7 @@ struct HotkeySettingsTab: View {
                                 isDefault = checkIsDefault()
                                 isRecording = false
                                 onChange()
+                                Analytics.send("settings.hotkey.changed")
                             }
                         )
                         .frame(height: 1)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AF7205E02F5AB4C40009775E /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = AF7205DF2F5AB4C40009775E /* HotKey */; };
+		AF7206012F5AB4C40009775E /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = AF7206032F5AB4C40009775E /* TelemetryDeck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF7205E02F5AB4C40009775E /* HotKey in Frameworks */,
+				AF7206012F5AB4C40009775E /* TelemetryDeck in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = CarryOver;
 			packageProductDependencies = (
 				AF7205DF2F5AB4C40009775E /* HotKey */,
+				AF7206032F5AB4C40009775E /* TelemetryDeck */,
 			);
 			productName = CarryOver;
 			productReference = AF7205CD2F59AA4F0009775E /* CarryOver.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AF7205DE2F5AB4C40009775E /* XCRemoteSwiftPackageReference "HotKey" */,
+				AF7206022F5AB4C40009775E /* XCRemoteSwiftPackageReference "SwiftSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AF7205CE2F59AA4F0009775E /* Products */;
@@ -348,6 +352,14 @@
 				kind = branch;
 			};
 		};
+		AF7206022F5AB4C40009775E /* XCRemoteSwiftPackageReference "SwiftSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TelemetryDeck/SwiftSDK";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -355,6 +367,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AF7205DE2F5AB4C40009775E /* XCRemoteSwiftPackageReference "HotKey" */;
 			productName = HotKey;
+		};
+		AF7206032F5AB4C40009775E /* TelemetryDeck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF7206022F5AB4C40009775E /* XCRemoteSwiftPackageReference "SwiftSDK" */;
+			productName = TelemetryDeck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

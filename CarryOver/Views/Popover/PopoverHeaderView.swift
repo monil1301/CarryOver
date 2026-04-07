@@ -55,7 +55,10 @@ struct PopoverHeaderView: View {
                             .keyboardShortcut("]", modifiers: [.command])
                             .disabled(viewModel.isToday)
 
-                        Button { viewModel.showDatePicker.toggle() } label: { Image(systemName: "calendar") }
+                        Button {
+                        if !viewModel.showDatePicker { Analytics.send("datePicker.opened") }
+                        viewModel.showDatePicker.toggle()
+                    } label: { Image(systemName: "calendar") }
                             .buttonStyle(.bordered)
                             .help("Pick a date")
                             .keyboardShortcut("p", modifiers: [.command])

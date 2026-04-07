@@ -14,6 +14,7 @@ struct GeneralSettingsTab: View {
     @State private var autoCheckForUpdates = UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") as? Bool ?? true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var isChecking = false
+    @State private var analyticsEnabled = UserDefaults.standard.object(forKey: "analytics.enabled") as? Bool ?? true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -23,8 +24,10 @@ struct GeneralSettingsTab: View {
                     .onChange(of: launchAtLogin) { newValue in
                         if newValue {
                             try? SMAppService.mainApp.register()
+                            Analytics.send("settings.openAtLogin.enabled")
                         } else {
                             try? SMAppService.mainApp.unregister()
+                            Analytics.send("settings.openAtLogin.disabled")
                         }
                     }
             }
@@ -66,6 +69,20 @@ struct GeneralSettingsTab: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
+            }
+
+            Divider()
+
+            // MARK: Privacy
+            SettingsSection("Privacy") {
+                Toggle("Send anonymous usage data", isOn: $analyticsEnabled)
+                    .onChange(of: analyticsEnabled) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: "analytics.enabled")
+                    }
+
+                Text("Helps improve CarryOver. No personal data is ever collected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(20)
