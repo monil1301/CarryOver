@@ -10,9 +10,7 @@ import SwiftUI
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case hotkey
-    // Future tabs:
-    // case data
-    // case advanced
+    case data
 
     var id: String { rawValue }
 
@@ -20,6 +18,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:  return "General"
         case .hotkey:   return "Hotkey"
+        case .data:     return "Data"
         }
     }
 
@@ -27,6 +26,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:  return "gearshape"
         case .hotkey:   return "keyboard"
+        case .data:     return "externaldrive"
         }
     }
 }
@@ -59,6 +59,8 @@ struct SettingsView: View {
                     GeneralSettingsTab(selfUpdater: selfUpdater)
                 case .hotkey:
                     HotkeySettingsTab(onChange: onChange)
+                case .data:
+                    DataSettingsTab()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -88,8 +90,14 @@ private struct SettingsTabButton: View {
                 Text(tab.label)
                     .font(.caption)
             }
-            .foregroundStyle(isSelected ? .primary : .secondary)
-            .frame(width: 64, height: 40)
+            .foregroundStyle(isSelected ? .blue : .secondary)
+            .frame(width: 64, height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.thickMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
+                    .opacity(isSelected ? 1 : 0)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
