@@ -33,12 +33,31 @@ final class DailyStore: ObservableObject {
     }
 
     func load() {
+        migrateFromSandboxIfNeeded()
         do {
             let data = try Data(contentsOf: fileURL)
             days = try JSONDecoder().decode([String: DayBucket].self, from: data)
         } catch {
             days = [:]
         }
+    }
+
+    /// Migrates data.json from the old sandbox container to the real Application Support path.
+    /// Runs once: only if the destination doesn't exist but the sandbox copy does.
+    private func migrateFromSandboxIfNeeded() {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: fileURL.path) else { return }
+
+        let home = fm.homeDirectoryForCurrentUser
+        let sandboxFile = home
+            .appendingPathComponent("Library/Containers/com.shah.CarryOver/Data/Library/Application Support/CarryOver/data.json")
+
+        guard fm.fileExists(atPath: sandboxFile.path) else { return }
+
+        // Ensure destination directory exists
+        let dir = fileURL.deletingLastPathComponent()
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? fm.copyItem(at: sandboxFile, to: fileURL)
     }
 
     func save() {
