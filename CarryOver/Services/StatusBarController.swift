@@ -15,6 +15,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     private var previousApp: NSRunningApplication?
     private var skipFocusRestore = false
+    private var globalClickMonitor: Any?
 
     init<Content: View>(rootView: Content, beforeShow: @escaping () -> Void) {
         self.beforeShow = beforeShow
@@ -64,9 +65,17 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Dismiss on clicks outside the app (e.g. other menu bar icons)
+        // .transient doesn't catch these, so we add a global monitor.
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            guard let self, self.popover.isShown else { return }
+            self.hidePopover(restoreFocus: false)
+        }
     }
 
     func hidePopover(restoreFocus: Bool = true) {
+        guard popover.isShown else { return }
         if !restoreFocus { skipFocusRestore = true }
         popover.performClose(nil)
     }
@@ -78,11 +87,26 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     // MARK: - NSPopoverDelegate
 
     func popoverDidClose(_ notification: Notification) {
+        if let monitor = globalClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalClickMonitor = nil
+        }
+
         if skipFocusRestore {
             skipFocusRestore = false
-        } else if let app = previousApp {
-            app.activate()
+            previousApp = nil
+            return
         }
+
+        // Defer by one tick so SettingsLink has time to create the window
+        let savedApp = previousApp
         previousApp = nil
+        DispatchQueue.main.async {
+            if NSApp.windows.contains(where: { $0.isVisible && $0.title == "CarryOver Settings" }) {
+                NSApp.activate(ignoringOtherApps: true)
+            } else {
+                savedApp?.activate()
+            }
+        }
     }
 }
