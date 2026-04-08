@@ -2,6 +2,11 @@
 
 ## [v1.4.0]
 
+- Auto update modified
+- Minor bug fixes
+
+## [v1.4.0]
+
 - Added ability to Search tasks
 - Support to Reorder tasks
 - In app Keyboard Shortcuts sheet
