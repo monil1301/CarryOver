@@ -10,6 +10,7 @@ struct InlineDatePickerView: View {
     let onDismiss: () -> Void
 
     @State private var displayedMonth: Date = Date()
+    @State private var focusedDate: Date? = nil
 
     private let calendar = Calendar.current
     private let weekdaySymbols = Calendar.current.veryShortWeekdaySymbols
@@ -63,7 +64,17 @@ struct InlineDatePickerView: View {
         .padding(.top, 8)
         .onAppear {
             displayedMonth = calendar.startOfMonth(for: selectedDate)
+            focusedDate = selectedDate
         }
+        .background(
+            DatePickerKeyBridge(
+                isOpen: true,
+                onClose: onDismiss,
+                onArrow: { delta in moveFocus(byDays: delta) },
+                onConfirm: { confirmFocus() }
+            )
+            .frame(width: 0, height: 0)
+        )
     }
 
     // MARK: - Date Cell
@@ -73,6 +84,7 @@ struct InlineDatePickerView: View {
         let isToday = calendar.isDateInToday(day.date)
         let isFuture = day.date > calendar.startOfDay(for: Date())
         let isOtherMonth = !calendar.isDate(day.date, equalTo: displayedMonth, toGranularity: .month)
+        let isFocused = focusedDate != nil && calendar.isDate(day.date, inSameDayAs: focusedDate!)
 
         return Button {
             if !isFuture && !isOtherMonth {
@@ -93,6 +105,11 @@ struct InlineDatePickerView: View {
                 .background(
                     Circle()
                         .fill(isSelected ? Color.accentColor : isToday ? Color.accentColor.opacity(0.15) : Color.clear)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.accentColor, lineWidth: 1.5)
+                        .opacity(isFocused && !isSelected ? 1 : 0)
                 )
         }
         .buttonStyle(.plain)
@@ -145,6 +162,25 @@ struct InlineDatePickerView: View {
         if let newMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth) {
             displayedMonth = newMonth
         }
+    }
+
+    private func moveFocus(byDays delta: Int) {
+        let base = focusedDate ?? selectedDate
+        guard let newDate = calendar.date(byAdding: .day, value: delta, to: base) else { return }
+        if newDate > calendar.startOfDay(for: Date()) { return }
+        focusedDate = newDate
+        if !calendar.isDate(newDate, equalTo: displayedMonth, toGranularity: .month) {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                displayedMonth = calendar.startOfMonth(for: newDate)
+            }
+        }
+    }
+
+    private func confirmFocus() {
+        guard let date = focusedDate else { return }
+        if date > calendar.startOfDay(for: Date()) { return }
+        selectedDate = date
+        onDismiss()
     }
 }
 

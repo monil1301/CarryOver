@@ -160,12 +160,6 @@ struct PopoverRootView: View {
         )
         .frame(width: 0, height: 0)
 
-        DatePickerEscBridge(
-            isOpen: viewModel.showDatePicker,
-            onClose: { viewModel.showDatePicker = false }
-        )
-        .frame(width: 0, height: 0)
-
         LaterKeyBridge(
             isOpen: viewModel.isLaterOpen,
             isEditing: viewModel.isLaterEditing,

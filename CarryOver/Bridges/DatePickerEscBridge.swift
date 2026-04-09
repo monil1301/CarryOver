@@ -6,15 +6,19 @@
 import SwiftUI
 import AppKit
 
-struct DatePickerEscBridge: NSViewRepresentable {
+struct DatePickerKeyBridge: NSViewRepresentable {
     var isOpen: Bool
     var onClose: () -> Void
+    var onArrow: (Int) -> Void
+    var onConfirm: () -> Void
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         context.coordinator.hostView = v
         context.coordinator.isOpen = isOpen
         context.coordinator.onClose = onClose
+        context.coordinator.onArrow = onArrow
+        context.coordinator.onConfirm = onConfirm
         context.coordinator.install()
         return v
     }
@@ -23,6 +27,8 @@ struct DatePickerEscBridge: NSViewRepresentable {
         context.coordinator.hostView = nsView
         context.coordinator.isOpen = isOpen
         context.coordinator.onClose = onClose
+        context.coordinator.onArrow = onArrow
+        context.coordinator.onConfirm = onConfirm
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -31,6 +37,8 @@ struct DatePickerEscBridge: NSViewRepresentable {
         weak var hostView: NSView?
         var isOpen: Bool = false
         var onClose: (() -> Void)?
+        var onArrow: ((Int) -> Void)?
+        var onConfirm: (() -> Void)?
 
         private var monitor: Any?
 
@@ -43,6 +51,28 @@ struct DatePickerEscBridge: NSViewRepresentable {
 
                 if event.keyCode == KeyCode.escape {
                     self.onClose?()
+                    return nil
+                }
+
+                if event.keyCode == KeyCode.leftArrow {
+                    self.onArrow?(-1)
+                    return nil
+                }
+                if event.keyCode == KeyCode.rightArrow {
+                    self.onArrow?(1)
+                    return nil
+                }
+                if event.keyCode == KeyCode.upArrow {
+                    self.onArrow?(-7)
+                    return nil
+                }
+                if event.keyCode == KeyCode.downArrow {
+                    self.onArrow?(7)
+                    return nil
+                }
+
+                if event.keyCode == KeyCode.returnKey || event.keyCode == KeyCode.enter || event.keyCode == KeyCode.space {
+                    self.onConfirm?()
                     return nil
                 }
 
