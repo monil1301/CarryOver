@@ -18,12 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         HotkeyService.registerDefaults()
-        store.load()
+        let carriedCount = store.load()
 
         Analytics.initialize()
         Analytics.send("app.launched")
-
-        let carriedCount = store.rolloverUnfinishedToToday()
         if carriedCount > 0 {
             Analytics.send("task.carriedOver", with: ["count": "\(carriedCount)"])
         }

@@ -53,6 +53,23 @@ final class PopoverViewModel: ObservableObject {
     // Cheat sheet state
     var isCheatSheetOpen: Bool = false { didSet { sendChange() } }
 
+    // Later state
+    var isLaterOpen: Bool = false { didSet { sendChange() } }
+    var laterSelection: UUID? {
+        didSet {
+            if isLaterEditing && laterSelection != laterEditingTaskID { cancelLaterEdit() }
+            sendChange()
+        }
+    }
+    var laterEditingTaskID: UUID? { didSet { sendChange() } }
+    var laterEditText: String = "" { didSet { sendChange() } }
+    var laterFocusListToken: Int = 0 { didSet { sendChange() } }
+    var laterDraggingTaskID: UUID? { didSet { sendChange() } }
+    private var laterDragSnapshot: [TaskItem]?
+    var isLaterSearchActive: Bool = false { didSet { sendChange() } }
+    var laterSearchQuery: String = "" { didSet { sendChange() } }
+    var laterSearchFocusToken: Int = 0 { didSet { sendChange() } }
+
     var pendingUndo: UndoAction? { didSet { sendChange() } }
     private var undoTimer: DispatchWorkItem?
 
@@ -94,6 +111,18 @@ final class PopoverViewModel: ObservableObject {
         guard isToday else { return false }
         return !Calendar.current.isDateInToday(task.createdAt)
     }
+
+    var laterTasks: [TaskItem] { store.laterTasks }
+    var laterCount: Int { store.laterTasks.count }
+    var hasLaterTasks: Bool { !store.laterTasks.isEmpty }
+    var isLaterEditing: Bool { laterEditingTaskID != nil }
+
+    var laterSearchResults: [TaskItem] {
+        let q = laterSearchQuery.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return laterTasks }
+        return laterTasks.filter { $0.text.lowercased().contains(q) }
+    }
+    var showLaterNudge: Bool { isToday && undoneTasks.isEmpty && hasLaterTasks }
 
     var searchResults: [TaskItem] {
         let q = searchQuery.lowercased().trimmingCharacters(in: .whitespaces)
@@ -174,6 +203,7 @@ final class PopoverViewModel: ObservableObject {
     func shiftDay(_ delta: Int) {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }
+        if isLaterOpen { closeLater() }
         if let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) {
             selectedDate = d
         }
@@ -343,6 +373,7 @@ final class PopoverViewModel: ObservableObject {
     func handleReset() {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }
+        if isLaterOpen { closeLater() }
         selectedDate = Date()
         selection = nil
         focusToken += 1
@@ -351,6 +382,7 @@ final class PopoverViewModel: ObservableObject {
     func handleDateChange() {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }
+        if isLaterOpen { closeLater() }
         selection = nil
         if isToday { focusToken += 1 } else { focusList() }
     }
@@ -358,6 +390,7 @@ final class PopoverViewModel: ObservableObject {
     func handleAppear() {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }
+        if isLaterOpen { closeLater() }
         if isToday { focusToken += 1 } else { focusList() }
     }
 
@@ -392,11 +425,12 @@ final class PopoverViewModel: ObservableObject {
     func toggleCheatSheet() {
         isCheatSheetOpen.toggle()
         if isCheatSheetOpen { Analytics.send("shortcuts.cheatSheetOpened") }
+        if isLaterOpen { closeLater() }
     }
     func closeCheatSheet() { isCheatSheetOpen = false }
 
     func openSearch() {
-        guard !isSearchActive else { return }
+        guard !isSearchActive, !isLaterOpen else { return }
         if isEditing { cancelEdit() }
         isSearchActive = true
         searchQuery = ""
@@ -435,6 +469,177 @@ final class PopoverViewModel: ObservableObject {
 
     func focusSearchField() {
         searchFocusToken += 1
+    }
+
+    // MARK: - Later
+
+    func openLater() {
+        if isCheatSheetOpen { isCheatSheetOpen = false }
+        if isSearchActive { closeSearch() }
+        if isEditing { cancelEdit() }
+        isLaterOpen = true
+        laterSelection = nil
+        Analytics.send("later.viewed")
+    }
+
+    func closeLater() {
+        if isLaterSearchActive { closeLaterSearch() }
+        if isLaterEditing { cancelLaterEdit() }
+        isLaterOpen = false
+        laterSelection = nil
+        if isToday { focusToken += 1 } else { focusList() }
+    }
+
+    func toggleLater() {
+        if isLaterOpen { closeLater() } else { openLater() }
+    }
+
+    func moveTaskToLater(taskID: UUID) {
+        store.moveTaskToLater(dayKey: selectedKey, taskID: taskID)
+        Analytics.send("task.movedToLater")
+    }
+
+    @discardableResult
+    func moveSelectedToLater() -> Bool {
+        guard isToday, let id = selection, !isCompletedHeaderSelected else { return false }
+        moveTaskToLater(taskID: id)
+        return true
+    }
+
+    @discardableResult
+    func moveSelectedLaterToToday() -> Bool {
+        guard let id = laterSelection else { return false }
+        moveLaterToToday(taskID: id)
+        return true
+    }
+
+    func moveSelectedLaterToToday(taskID: UUID) {
+        moveLaterToToday(taskID: taskID)
+    }
+
+    func completeLaterTask(taskID: UUID) {
+        moveLaterToToday(taskID: taskID)
+        let key = store.todayKey
+        store.toggleDone(dayKey: key, taskID: taskID)
+        Analytics.send("task.completedFromLater")
+    }
+
+    private func moveLaterToToday(taskID: UUID) {
+        let tasks = laterTasks
+        let idx = tasks.firstIndex(where: { $0.id == taskID })
+        store.moveTaskToToday(laterTaskID: taskID)
+        Analytics.send("task.movedToToday")
+
+        let remaining = laterTasks
+        if let idx, !remaining.isEmpty {
+            laterSelection = remaining[min(idx, remaining.count - 1)].id
+        } else {
+            laterSelection = remaining.first?.id
+        }
+    }
+
+    func deleteLaterSelected() {
+        guard let id = laterSelection else { return }
+        let tasks = laterTasks
+        let idx = tasks.firstIndex(where: { $0.id == id })
+        store.deleteLaterTask(taskID: id)
+
+        let remaining = laterTasks
+        if let idx, !remaining.isEmpty {
+            laterSelection = remaining[min(idx, remaining.count - 1)].id
+        } else {
+            laterSelection = remaining.first?.id
+        }
+    }
+
+    func deleteLaterTask(taskID: UUID) {
+        store.deleteLaterTask(taskID: taskID)
+    }
+
+    func startLaterEditing(taskID: UUID) {
+        guard let task = laterTasks.first(where: { $0.id == taskID }) else { return }
+        laterEditingTaskID = taskID
+        laterEditText = task.text
+    }
+
+    func startLaterEditingSelected() -> Bool {
+        guard let id = laterSelection else { return false }
+        startLaterEditing(taskID: id)
+        return true
+    }
+
+    func commitLaterEdit() {
+        guard let taskID = laterEditingTaskID else { return }
+        store.updateLaterTaskText(taskID: taskID, text: laterEditText)
+        laterEditingTaskID = nil
+        laterEditText = ""
+        laterFocusListToken += 1
+    }
+
+    func cancelLaterEdit() {
+        laterEditingTaskID = nil
+        laterEditText = ""
+        laterFocusListToken += 1
+    }
+
+    func laterFocusList() {
+        laterSelection = (isLaterSearchActive ? laterSearchResults : laterTasks).first?.id
+        laterFocusListToken += 1
+    }
+
+    func moveLaterSelectedTask(direction: Int) -> Bool {
+        guard !isLaterEditing, !isLaterSearchActive,
+              let id = laterSelection else { return false }
+        store.moveLaterTask(taskID: id, direction: direction)
+        return true
+    }
+
+    func reorderLaterTasks(fromOffsets: IndexSet, toOffset: Int) {
+        guard !isLaterEditing, !isLaterSearchActive else { return }
+        store.reorderLaterTasks(fromOffsets: fromOffsets, toOffset: toOffset)
+    }
+
+    func beginLaterDrag(taskID: UUID) {
+        laterDragSnapshot = store.laterTasks
+        laterDraggingTaskID = taskID
+    }
+
+    func endLaterDrag() {
+        guard laterDraggingTaskID != nil else { return }
+        if let id = laterDraggingTaskID {
+            laterSelection = id
+        }
+        laterDraggingTaskID = nil
+        laterDragSnapshot = nil
+    }
+
+    func openLaterSearch() {
+        guard !isLaterSearchActive else { return }
+        if isLaterEditing { cancelLaterEdit() }
+        isLaterSearchActive = true
+        laterSearchQuery = ""
+        laterSelection = nil
+        laterSearchFocusToken += 1
+    }
+
+    func closeLaterSearch() {
+        guard isLaterSearchActive else { return }
+        isLaterSearchActive = false
+        laterSearchQuery = ""
+        if let sel = laterSelection, laterTasks.contains(where: { $0.id == sel }) {
+            laterFocusListToken += 1
+        } else {
+            laterSelection = nil
+            laterFocusListToken += 1
+        }
+    }
+
+    func handleLaterSearchEsc() {
+        if !laterSearchQuery.isEmpty {
+            laterSearchQuery = ""
+        } else {
+            closeLaterSearch()
+        }
     }
 
     // MARK: - Undo

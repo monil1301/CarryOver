@@ -93,7 +93,8 @@ struct TaskListView: View {
                     onCommitEdit: { viewModel.commitEdit() },
                     onCancelEdit: { viewModel.cancelEdit() },
                     onDelete: { viewModel.deleteTask(taskID: task.id) },
-                    onSelect: { viewModel.selectTask(task.id) }
+                    onSelect: { viewModel.selectTask(task.id) },
+                    onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
                 )
                 .tag(task.id)
                 .listRowSeparator(.hidden)
@@ -120,7 +121,8 @@ struct TaskListView: View {
                 onCommitEdit: { viewModel.commitEdit() },
                 onCancelEdit: { viewModel.cancelEdit() },
                 onDelete: { viewModel.deleteTask(taskID: task.id) },
-                onSelect: { viewModel.selectTask(task.id) }
+                onSelect: { viewModel.selectTask(task.id) },
+                onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
             )
             .tag(task.id)
             .opacity(viewModel.draggingTaskID == task.id ? 0.3 : 1.0)
@@ -189,7 +191,8 @@ struct TaskListView: View {
                         onCommitEdit: { viewModel.commitEdit() },
                         onCancelEdit: { viewModel.cancelEdit() },
                         onDelete: { viewModel.deleteTask(taskID: task.id) },
-                        onSelect: { viewModel.selectTask(task.id) }
+                        onSelect: { viewModel.selectTask(task.id) },
+                        onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
                     )
                     .tag(task.id)
                     .listRowSeparator(.hidden)
@@ -200,11 +203,27 @@ struct TaskListView: View {
         }
 
         if viewModel.tasks.isEmpty {
-            Text("No tasks for this day.")
-                .foregroundStyle(.secondary)
+            if viewModel.showLaterNudge {
+                VStack(spacing: 6) {
+                    Text("You have \(viewModel.laterCount) task\(viewModel.laterCount == 1 ? "" : "s") in Later.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                    Button("View Later") { viewModel.openLater() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.blue)
+                }
+                .frame(maxWidth: .infinity)
                 .listRowSeparator(.hidden)
                 .listRowInsets(rowInsets)
                 .listRowBackground(Color.clear)
+            } else {
+                Text("No tasks for this day.")
+                    .foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(rowInsets)
+                    .listRowBackground(Color.clear)
+            }
         }
     }
 }

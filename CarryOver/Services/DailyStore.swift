@@ -12,6 +12,7 @@ internal import Combine
 @MainActor
 final class DailyStore: ObservableObject {
     @Published private(set) var days: [String: DayBucket] = [:]
+    @Published private(set) var laterTasks: [TaskItem] = []
     @Published var resetToken: Int = 0
 
     private let df: DateFormatter = {
@@ -24,40 +25,46 @@ final class DailyStore: ObservableObject {
 
     var todayKey: String { df.string(from: Date()) }
 
-    private var fileURL: URL {
+    private var appSupportDir: URL {
         let fm = FileManager.default
         let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = base.appendingPathComponent("CarryOver", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("data.json")
+        return dir
     }
 
-    func load() {
-        migrateFromSandboxIfNeeded()
+    private var fileURL: URL { appSupportDir.appendingPathComponent("data.json") }
+    private var laterFileURL: URL { appSupportDir.appendingPathComponent("later.json") }
+
+    @discardableResult
+    func load() -> Int {
         do {
             let data = try Data(contentsOf: fileURL)
             days = try JSONDecoder().decode([String: DayBucket].self, from: data)
         } catch {
             days = [:]
         }
+
+        loadLater()
+        return rolloverUnfinishedToToday()
     }
 
-    /// Migrates data.json from the old sandbox container to the real Application Support path.
-    /// Runs once: only if the destination doesn't exist but the sandbox copy does.
-    private func migrateFromSandboxIfNeeded() {
-        let fm = FileManager.default
-        guard !fm.fileExists(atPath: fileURL.path) else { return }
+    private func loadLater() {
+        do {
+            let data = try Data(contentsOf: laterFileURL)
+            laterTasks = try JSONDecoder().decode([TaskItem].self, from: data)
+        } catch {
+            laterTasks = []
+        }
+    }
 
-        let home = fm.homeDirectoryForCurrentUser
-        let sandboxFile = home
-            .appendingPathComponent("Library/Containers/com.shah.CarryOver/Data/Library/Application Support/CarryOver/data.json")
-
-        guard fm.fileExists(atPath: sandboxFile.path) else { return }
-
-        // Ensure destination directory exists
-        let dir = fileURL.deletingLastPathComponent()
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? fm.copyItem(at: sandboxFile, to: fileURL)
+    func saveLater() {
+        do {
+            let data = try JSONEncoder().encode(laterTasks)
+            try data.write(to: laterFileURL, options: [.atomic])
+        } catch {
+            // keep silent for now
+        }
     }
 
     func save() {
@@ -207,5 +214,62 @@ final class DailyStore: ObservableObject {
     func restoreBucket(dayKey: String, bucket: DayBucket) {
         days[dayKey] = bucket
         save()
+    }
+
+    // MARK: - Later
+
+    func moveTaskToLater(dayKey: String, taskID: UUID) {
+        guard var bucket = days[dayKey],
+              let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        var task = bucket.tasks.remove(at: i)
+        task.isDone = false
+        task.completedAt = nil
+        laterTasks.append(task)
+        days[dayKey] = bucket
+        save()
+        saveLater()
+    }
+
+    func moveTaskToToday(laterTaskID: UUID) {
+        guard let i = laterTasks.firstIndex(where: { $0.id == laterTaskID }) else { return }
+        var task = laterTasks.remove(at: i)
+        task.createdAt = Date()
+        task.isDone = false
+        task.completedAt = nil
+
+        let key = todayKey
+        var bucket = days[key, default: DayBucket()]
+        let insertIndex = bucket.tasks.firstIndex(where: { $0.isDone }) ?? bucket.tasks.count
+        bucket.tasks.insert(task, at: insertIndex)
+        days[key] = bucket
+
+        save()
+        saveLater()
+    }
+
+    func deleteLaterTask(taskID: UUID) {
+        laterTasks.removeAll { $0.id == taskID }
+        saveLater()
+    }
+
+    func moveLaterTask(taskID: UUID, direction: Int) {
+        guard let idx = laterTasks.firstIndex(where: { $0.id == taskID }) else { return }
+        let newIdx = idx + direction
+        guard newIdx >= 0, newIdx < laterTasks.count else { return }
+        laterTasks.swapAt(idx, newIdx)
+        saveLater()
+    }
+
+    func reorderLaterTasks(fromOffsets: IndexSet, toOffset: Int) {
+        laterTasks.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        saveLater()
+    }
+
+    func updateLaterTaskText(taskID: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let i = laterTasks.firstIndex(where: { $0.id == taskID }) else { return }
+        laterTasks[i].text = trimmed
+        saveLater()
     }
 }

@@ -28,7 +28,10 @@ struct PopoverRootView: View {
             PopoverHeaderView(
                 viewModel: viewModel,
                 isCheatSheetOpen: viewModel.isCheatSheetOpen,
-                onBack: { viewModel.closeCheatSheet() }
+                isLaterOpen: viewModel.isLaterOpen,
+                onBack: { viewModel.closeCheatSheet() },
+                onCloseLater: { viewModel.closeLater() },
+                onOpenLater: { viewModel.openLater() }
             )
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -109,9 +112,18 @@ struct PopoverRootView: View {
                         .background(.background)
                         .transition(.move(edge: .trailing))
                 }
+
+                // Later overlay
+                if viewModel.isLaterOpen {
+                    LaterView(viewModel: viewModel)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.background)
+                        .transition(.move(edge: .trailing))
+                }
             }
         }
         .animation(.easeOut(duration: 0.2), value: viewModel.isCheatSheetOpen)
+        .animation(.easeOut(duration: 0.2), value: viewModel.isLaterOpen)
         .animation(.easeInOut(duration: 0.15), value: viewModel.isSearchActive)
         .onDrop(of: [.text], isTargeted: nil) { _ in
             viewModel.endDrag()
@@ -151,6 +163,15 @@ struct PopoverRootView: View {
         DatePickerEscBridge(
             isOpen: viewModel.showDatePicker,
             onClose: { viewModel.showDatePicker = false }
+        )
+        .frame(width: 0, height: 0)
+
+        LaterKeyBridge(
+            isOpen: viewModel.isLaterOpen,
+            isEditing: viewModel.isLaterEditing,
+            onToggle: { viewModel.toggleLater() },
+            onClose: { viewModel.closeLater() },
+            onMoveToLater: { viewModel.moveSelectedToLater() }
         )
         .frame(width: 0, height: 0)
     }

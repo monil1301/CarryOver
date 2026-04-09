@@ -17,6 +17,7 @@ struct ShortcutsCheatSheetView: View {
                     ("Next day", ["⌘", "]"]),
                     ("Go to today", ["⌘", "T"]),
                     ("Date picker", ["⌘", "P"]),
+                    ("Later", ["⌘", "L"]),
                 ])
 
                 sectionDivider
@@ -26,9 +27,19 @@ struct ShortcutsCheatSheetView: View {
                     ("Edit task", ["⏎", "Return"]),
                     ("Delete task", ["⌫", "Delete"]),
                     ("Toggle complete", ["Space"]),
+                    ("Move to Later", ["⌘", "⇧", "L"]),
                     ("Move up", ["⌘", "↑"]),
                     ("Move down", ["⌘", "↓"]),
                     ("Undo", ["⌘", "Z"]),
+                ])
+
+                sectionDivider
+
+                shortcutSection("LATER", shortcuts: [
+                    ("Move to Today", ["⌘", "⏎"]),
+                    ("Edit task", ["⏎"]),
+                    ("Delete task", ["⌫"]),
+                    ("Search", ["⌘", "F"]),
                 ])
 
                 sectionDivider

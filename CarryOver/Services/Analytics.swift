@@ -29,9 +29,4 @@ enum Analytics {
             "macOSVersion": osVersion,
         ]
     }
-
-    // MARK: - Later (stub when Later feature is implemented)
-    // "later.viewed" — when Later view is opened
-    // "task.movedToLater" — when a task is moved to Later
-    // "task.movedToToday" — when a task is moved from Later back to Today
 }

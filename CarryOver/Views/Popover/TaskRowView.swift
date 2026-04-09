@@ -21,6 +21,7 @@ struct TaskRowView: View {
     let onCancelEdit: () -> Void
     let onDelete: () -> Void
     let onSelect: () -> Void
+    var onMoveToLater: (() -> Void)? = nil
 
     @FocusState private var fieldFocused: Bool
     @State private var isHovered = false
@@ -87,6 +88,9 @@ struct TaskRowView: View {
         .onHover { isHovered = $0 }
         .contextMenu {
             Button("Edit") { onEdit() }
+            if let onMoveToLater {
+                Button("Move to Later") { onMoveToLater() }
+            }
             Button("Delete") { onDelete() }
         }
     }
