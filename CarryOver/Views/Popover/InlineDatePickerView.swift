@@ -71,6 +71,7 @@ struct InlineDatePickerView: View {
                 isOpen: true,
                 onClose: onDismiss,
                 onArrow: { delta in moveFocus(byDays: delta) },
+                onShiftMonth: { delta in shiftMonthAndFocus(delta) },
                 onConfirm: { confirmFocus() }
             )
             .frame(width: 0, height: 0)
@@ -161,6 +162,26 @@ struct InlineDatePickerView: View {
     private func shiftMonth(_ delta: Int) {
         if let newMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth) {
             displayedMonth = newMonth
+        }
+    }
+
+    private func shiftMonthAndFocus(_ delta: Int) {
+        guard let newMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth) else { return }
+        if delta > 0 && calendar.isDate(displayedMonth, equalTo: Date(), toGranularity: .month) { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            displayedMonth = newMonth
+        }
+        // Move focus to same day-of-month in the new month, clamped to today
+        let base = focusedDate ?? selectedDate
+        let day = calendar.component(.day, from: base)
+        let newMonthRange = calendar.range(of: .day, in: .month, for: newMonth)!
+        let clampedDay = min(day, newMonthRange.upperBound - 1)
+        if var comps = Optional(calendar.dateComponents([.year, .month], from: newMonth)) {
+            comps.day = clampedDay
+            if let newFocus = calendar.date(from: comps) {
+                let today = calendar.startOfDay(for: Date())
+                focusedDate = newFocus > today ? today : newFocus
+            }
         }
     }
 

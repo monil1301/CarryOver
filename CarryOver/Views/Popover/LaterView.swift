@@ -98,10 +98,17 @@ struct LaterView: View {
             LaterListKeyBridge(
                 isOpen: viewModel.isLaterOpen,
                 isEditing: viewModel.isLaterEditing,
+                hasSelection: viewModel.laterSelection != nil,
                 onReturn: { viewModel.startLaterEditingSelected() },
                 onMoveToToday: { viewModel.moveSelectedLaterToToday() },
-                onDelete: { viewModel.deleteLaterSelected() }
+                onDelete: { viewModel.deleteLaterSelected() },
+                onFocusList: { viewModel.laterFocusList() }
             )
+            .frame(width: 0, height: 0)
+
+            ListSpaceKeyBridge(isEditing: viewModel.isLaterEditing, onSpace: {
+                viewModel.completeSelectedLater()
+            })
             .frame(width: 0, height: 0)
 
             ListReorderKeyBridge(

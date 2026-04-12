@@ -9,18 +9,22 @@ import AppKit
 struct LaterListKeyBridge: NSViewRepresentable {
     var isOpen: Bool
     var isEditing: Bool
+    var hasSelection: Bool
     var onReturn: () -> Bool
     var onMoveToToday: () -> Bool
     var onDelete: () -> Void
+    var onFocusList: () -> Void
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         context.coordinator.hostView = v
         context.coordinator.isOpen = isOpen
         context.coordinator.isEditing = isEditing
+        context.coordinator.hasSelection = hasSelection
         context.coordinator.onReturn = onReturn
         context.coordinator.onMoveToToday = onMoveToToday
         context.coordinator.onDelete = onDelete
+        context.coordinator.onFocusList = onFocusList
         context.coordinator.install()
         return v
     }
@@ -29,9 +33,11 @@ struct LaterListKeyBridge: NSViewRepresentable {
         context.coordinator.hostView = nsView
         context.coordinator.isOpen = isOpen
         context.coordinator.isEditing = isEditing
+        context.coordinator.hasSelection = hasSelection
         context.coordinator.onReturn = onReturn
         context.coordinator.onMoveToToday = onMoveToToday
         context.coordinator.onDelete = onDelete
+        context.coordinator.onFocusList = onFocusList
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -40,9 +46,11 @@ struct LaterListKeyBridge: NSViewRepresentable {
         weak var hostView: NSView?
         var isOpen: Bool = false
         var isEditing: Bool = false
+        var hasSelection: Bool = false
         var onReturn: (() -> Bool)?
         var onMoveToToday: (() -> Bool)?
         var onDelete: (() -> Void)?
+        var onFocusList: (() -> Void)?
 
         private var monitor: Any?
 
@@ -55,6 +63,12 @@ struct LaterListKeyBridge: NSViewRepresentable {
 
                 let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                     .subtracting([.numericPad, .function])
+
+                // ↓ — focus list and select first row when nothing is selected
+                if !self.isEditing && flags.isEmpty && event.keyCode == KeyCode.downArrow && !self.hasSelection {
+                    self.onFocusList?()
+                    return nil
+                }
 
                 // ⌘⏎ — move selected to Today
                 if flags == .command && (event.keyCode == KeyCode.returnKey || event.keyCode == KeyCode.enter) {

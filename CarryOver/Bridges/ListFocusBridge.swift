@@ -13,18 +13,24 @@ struct ListFocusBridge: NSViewRepresentable {
     @Binding var token: Int
 
     func makeNSView(context: Context) -> NSView {
-        NSView()
+        return NSView()
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        // When token changes, focus the list (best-effort)
+        guard token != context.coordinator.lastToken else { return }
+        context.coordinator.lastToken = token
         DispatchQueue.main.async {
             guard let window = nsView.window else { return }
-            // Find the first NSTableView or NSOutlineView in the window and focus it
-            if let target = findFirstTableLikeView(in: window.contentView) {
+            if let target = self.findFirstTableLikeView(in: window.contentView) {
                 window.makeFirstResponder(target)
             }
         }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var lastToken: Int = 0
     }
 
     private func findFirstTableLikeView(in view: NSView?) -> NSView? {

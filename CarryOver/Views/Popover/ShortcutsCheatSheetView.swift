@@ -18,6 +18,7 @@ struct ShortcutsCheatSheetView: View {
                     ("Go to today", ["⌘", "T"]),
                     ("Date picker", ["⌘", "P"]),
                     ("Navigate dates", ["↑", "↓", "←", "→"]),
+                    ("Change month", ["⌘", "←", "→"]),
                     ("Select date", ["⏎", "Space"]),
                     ("Later", ["⌘", "L"]),
                 ])

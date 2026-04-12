@@ -36,7 +36,14 @@ final class PopoverViewModel: ObservableObject {
         }
     }
     var focusListToken: Int = 0 { didSet { sendChange() } }
-    var showDatePicker: Bool = false { didSet { sendChange() } }
+    var showDatePicker: Bool = false {
+        didSet {
+            if !showDatePicker && oldValue {
+                if isToday { focusToken += 1 } else { focusList() }
+            }
+            sendChange()
+        }
+    }
     var editingTaskID: UUID? { didSet { sendChange() } }
     var editText: String = "" { didSet { sendChange() } }
     var isCompletedCollapsed: Bool = true { didSet { sendChange() } }
@@ -477,8 +484,9 @@ final class PopoverViewModel: ObservableObject {
         if isCheatSheetOpen { isCheatSheetOpen = false }
         if isSearchActive { closeSearch() }
         if isEditing { cancelEdit() }
+        laterFocusListToken += 1
         isLaterOpen = true
-        laterSelection = nil
+        laterSelection = laterTasks.first?.id
         Analytics.send("later.viewed")
     }
 
@@ -487,6 +495,8 @@ final class PopoverViewModel: ObservableObject {
         if isLaterEditing { cancelLaterEdit() }
         isLaterOpen = false
         laterSelection = nil
+        // Reset so the recreated TaskListView's ListFocusBridge doesn't steal focus
+        focusListToken = 0
         if isToday { focusToken += 1 } else { focusList() }
     }
 
@@ -560,6 +570,13 @@ final class PopoverViewModel: ObservableObject {
         guard let task = laterTasks.first(where: { $0.id == taskID }) else { return }
         laterEditingTaskID = taskID
         laterEditText = task.text
+    }
+
+    @discardableResult
+    func completeSelectedLater() -> Bool {
+        guard let id = laterSelection else { return false }
+        completeLaterTask(taskID: id)
+        return true
     }
 
     func startLaterEditingSelected() -> Bool {

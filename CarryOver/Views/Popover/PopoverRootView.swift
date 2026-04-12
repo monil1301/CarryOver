@@ -62,7 +62,7 @@ struct PopoverRootView: View {
                             selectedDate: $viewModel.selectedDate,
                             onDismiss: { viewModel.showDatePicker = false }
                         )
-                    } else {
+                    } else if !viewModel.isLaterOpen {
                         TaskListView(viewModel: viewModel)
                     }
 
@@ -118,12 +118,10 @@ struct PopoverRootView: View {
                     LaterView(viewModel: viewModel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(.background)
-                        .transition(.move(edge: .trailing))
                 }
             }
         }
         .animation(.easeOut(duration: 0.2), value: viewModel.isCheatSheetOpen)
-        .animation(.easeOut(duration: 0.2), value: viewModel.isLaterOpen)
         .animation(.easeInOut(duration: 0.15), value: viewModel.isSearchActive)
         .onDrop(of: [.text], isTargeted: nil) { _ in
             viewModel.endDrag()
@@ -140,7 +138,7 @@ struct PopoverRootView: View {
             .opacity(0)
 
         ListUpArrowBridge(
-            shouldHandle: { viewModel.isToday || viewModel.isSearchActive },
+            shouldHandle: { !viewModel.isLaterOpen && (viewModel.isToday || viewModel.isSearchActive) },
             onUpArrow: { viewModel.handleUpArrow() }
         )
         .frame(width: 0, height: 0)
