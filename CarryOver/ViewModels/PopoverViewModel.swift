@@ -377,6 +377,12 @@ final class PopoverViewModel: ObservableObject {
         if isToday { focusToken += 1 }
     }
 
+    func handleSlashKey() {
+        guard isToday, !isLaterOpen, !isCheatSheetOpen, !showDatePicker, !isSearchActive else { return }
+        selection = nil
+        focusToken += 1
+    }
+
     func handleReset() {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }

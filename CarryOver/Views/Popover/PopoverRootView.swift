@@ -148,7 +148,8 @@ struct PopoverRootView: View {
             isEditing: viewModel.isEditing,
             isSearchActive: viewModel.isSearchActive,
             onActivate: { viewModel.openSearch() },
-            onClose: { viewModel.closeSearch() }
+            onClose: { viewModel.closeSearch() },
+            onFocusInput: { viewModel.handleSlashKey() }
         )
         .frame(width: 0, height: 0)
 

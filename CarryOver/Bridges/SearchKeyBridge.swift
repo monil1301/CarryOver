@@ -11,6 +11,7 @@ struct SearchKeyBridge: NSViewRepresentable {
     var isSearchActive: Bool
     var onActivate: () -> Void
     var onClose: () -> Void
+    var onFocusInput: (() -> Void)?
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
@@ -20,6 +21,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.isSearchActive = isSearchActive
         context.coordinator.onActivate = onActivate
         context.coordinator.onClose = onClose
+        context.coordinator.onFocusInput = onFocusInput
         return v
     }
 
@@ -29,6 +31,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.isSearchActive = isSearchActive
         context.coordinator.onActivate = onActivate
         context.coordinator.onClose = onClose
+        context.coordinator.onFocusInput = onFocusInput
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -39,6 +42,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         var isSearchActive: Bool = false
         var onActivate: (() -> Void)?
         var onClose: (() -> Void)?
+        var onFocusInput: (() -> Void)?
 
         private var monitor: Any?
 
@@ -67,12 +71,13 @@ struct SearchKeyBridge: NSViewRepresentable {
                     return event
                 }
 
-                // "/" key — only when not typing in any text input
+                // "/" key — focus add-task input (only when not typing in any text input)
                 if flags.isEmpty, event.charactersIgnoringModifiers == "/" {
+                    guard let onFocusInput = self.onFocusInput else { return event }
                     guard let fr = window.firstResponder else { return event }
                     let isTextInput = fr is NSTextView || fr is NSTextField
                     if !isTextInput && !self.isEditing {
-                        self.onActivate?()
+                        onFocusInput()
                         return nil
                     }
                 }

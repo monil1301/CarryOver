@@ -13,6 +13,7 @@ struct ShortcutsCheatSheetView: View {
             VStack(alignment: .leading, spacing: 0) {
                 shortcutSection("NAVIGATION", shortcuts: [
                     ("Open app", ["⌃", "⌥", "Space"]),
+                    ("Focus input", ["/"]),
                     ("Previous day", ["⌘", "["]),
                     ("Next day", ["⌘", "]"]),
                     ("Go to today", ["⌘", "T"]),
@@ -30,6 +31,7 @@ struct ShortcutsCheatSheetView: View {
                     ("Edit task", ["⏎", "Return"]),
                     ("Delete task", ["⌫", "Delete"]),
                     ("Toggle complete", ["Space"]),
+                    ("Search", ["⌘", "F"]),
                     ("Move to Later", ["⌘", "⇧", "L"]),
                     ("Move up", ["⌘", "↑"]),
                     ("Move down", ["⌘", "↓"]),
