@@ -91,9 +91,7 @@ struct LaterView: View {
                 viewModel.endLaterDrag()
                 return true
             }
-
-            ListFocusBridge(token: $viewModel.laterFocusListToken)
-                .frame(width: 0, height: 0)
+            .background(ListFocusBridge(token: $viewModel.laterFocusListToken))
 
             LaterListKeyBridge(
                 isOpen: viewModel.isLaterOpen,

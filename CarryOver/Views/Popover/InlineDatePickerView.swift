@@ -8,6 +8,7 @@ import SwiftUI
 struct InlineDatePickerView: View {
     @Binding var selectedDate: Date
     let onDismiss: () -> Void
+    var isKeyBridgeActive: Bool = true
 
     @State private var displayedMonth: Date = Date()
     @State private var focusedDate: Date? = nil
@@ -37,7 +38,7 @@ struct InlineDatePickerView: View {
 
             // Weekday labels
             LazyVGrid(columns: columns, spacing: 0) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -68,7 +69,7 @@ struct InlineDatePickerView: View {
         }
         .background(
             DatePickerKeyBridge(
-                isOpen: true,
+                isOpen: isKeyBridgeActive,
                 onClose: onDismiss,
                 onArrow: { delta in moveFocus(byDays: delta) },
                 onShiftMonth: { delta in shiftMonthAndFocus(delta) },

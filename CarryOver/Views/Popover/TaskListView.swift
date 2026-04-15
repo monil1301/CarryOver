@@ -27,9 +27,7 @@ struct TaskListView: View {
         .onDeleteCommand {
             viewModel.deleteSelected()
         }
-
-        ListFocusBridge(token: $viewModel.focusListToken)
-            .frame(width: 0, height: 0)
+        .background(ListFocusBridge(token: $viewModel.focusListToken))
 
         ListReturnKeyBridge(onReturn: {
             guard !viewModel.isEditing else { return false }

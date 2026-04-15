@@ -60,7 +60,8 @@ struct PopoverRootView: View {
                     if viewModel.showDatePicker {
                         InlineDatePickerView(
                             selectedDate: $viewModel.selectedDate,
-                            onDismiss: { viewModel.showDatePicker = false }
+                            onDismiss: { viewModel.showDatePicker = false },
+                            isKeyBridgeActive: !viewModel.isLaterOpen
                         )
                     } else if !viewModel.isLaterOpen {
                         TaskListView(viewModel: viewModel)

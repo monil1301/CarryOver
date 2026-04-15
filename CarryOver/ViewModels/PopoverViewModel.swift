@@ -497,7 +497,15 @@ final class PopoverViewModel: ObservableObject {
         laterSelection = nil
         // Reset so the recreated TaskListView's ListFocusBridge doesn't steal focus
         focusListToken = 0
-        if isToday { focusToken += 1 } else { focusList() }
+        // Defer focus restoration to the next tick — if openLater() is called before
+        // this fires (rapid Cmd+L after Esc), isLaterOpen will be true and we skip
+        // the text field focus to avoid racing with LaterView's ListFocusBridge.
+        if !showDatePicker {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isLaterOpen else { return }
+                if self.isToday { self.focusToken += 1 } else { self.focusList() }
+            }
+        }
     }
 
     func toggleLater() {
