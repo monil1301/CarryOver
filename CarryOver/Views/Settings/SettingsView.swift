@@ -53,19 +53,21 @@ struct SettingsView: View {
             Divider()
 
             // Tab content
-            Group {
-                switch selectedTab {
-                case .general:
-                    GeneralSettingsTab(selfUpdater: selfUpdater)
-                case .hotkey:
-                    HotkeySettingsTab(onChange: onChange)
-                case .data:
-                    DataSettingsTab()
+            ScrollView {
+                Group {
+                    switch selectedTab {
+                    case .general:
+                        GeneralSettingsTab(selfUpdater: selfUpdater)
+                    case .hotkey:
+                        HotkeySettingsTab(onChange: onChange)
+                    case .data:
+                        DataSettingsTab()
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(width: 400, height: 280)
+        .frame(width: 400, height: 320)
         .onAppear {
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)

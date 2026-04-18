@@ -13,6 +13,7 @@ struct GeneralSettingsTab: View {
 
     @State private var autoCheckForUpdates = UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") as? Bool ?? true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var showCarriedTag = UserDefaults.standard.object(forKey: DisplayPreferences.showCarriedTagKey) as? Bool ?? true
     @State private var isChecking = false
 
     var body: some View {
@@ -28,6 +29,17 @@ struct GeneralSettingsTab: View {
                             try? SMAppService.mainApp.unregister()
                             Analytics.send("settings.openAtLogin.disabled")
                         }
+                    }
+            }
+
+            Divider()
+
+            // MARK: Display
+            SettingsSection("Display") {
+                Toggle("Show \"carried\" tag on carried tasks", isOn: $showCarriedTag)
+                    .onChange(of: showCarriedTag) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: DisplayPreferences.showCarriedTagKey)
+                        Analytics.send(newValue ? "settings.showCarriedTag.enabled" : "settings.showCarriedTag.disabled")
                     }
             }
 

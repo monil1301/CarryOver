@@ -25,9 +25,18 @@ struct TaskRowView: View {
 
     @FocusState private var fieldFocused: Bool
     @State private var isHovered = false
+    @AppStorage(DisplayPreferences.showCarriedTagKey) private var showCarriedTag: Bool = true
 
     private var showDragHandle: Bool {
         isReorderable && isToday && !task.isDone && !isEditing && (isHovered || isSelected)
+    }
+
+    private var canShowDragHandle: Bool {
+        isReorderable && isToday && !task.isDone && !isEditing
+    }
+
+    private var canShowCarriedBadge: Bool {
+        isCarried && !task.isDone && showCarriedTag
     }
 
     var body: some View {
@@ -57,24 +66,25 @@ struct TaskRowView: View {
 
             Spacer()
 
-            if showDragHandle {
-                Image(systemName: "line.3.horizontal")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 6)
-            }
-
-            if isCarried && !task.isDone && !showDragHandle {
-                HStack(spacing: 3) {
-                    Text("↩")
-                    Text("carried")
+            if canShowCarriedBadge || canShowDragHandle {
+                ZStack {
+                    Color.clear
+                    if showDragHandle {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    } else if canShowCarriedBadge {
+                        Text("↩")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.15), lineWidth: 0.5))
+                    }
                 }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .frame(width: 24)
                 .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.15), lineWidth: 0.5))
             }
         }
         .padding(.vertical, 4)
