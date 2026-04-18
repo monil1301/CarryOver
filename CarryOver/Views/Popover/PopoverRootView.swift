@@ -147,6 +147,7 @@ struct PopoverRootView: View {
         SearchKeyBridge(
             isEditing: viewModel.isEditing,
             isSearchActive: viewModel.isSearchActive,
+            isOverlayOpen: viewModel.isLaterOpen,
             onActivate: { viewModel.openSearch() },
             onClose: { viewModel.closeSearch() },
             onFocusInput: { viewModel.handleSlashKey() }

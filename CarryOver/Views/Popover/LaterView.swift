@@ -96,6 +96,7 @@ struct LaterView: View {
             LaterListKeyBridge(
                 isOpen: viewModel.isLaterOpen,
                 isEditing: viewModel.isLaterEditing,
+                isSearchActive: viewModel.isLaterSearchActive,
                 hasSelection: viewModel.laterSelection != nil,
                 onReturn: { viewModel.startLaterEditingSelected() },
                 onMoveToToday: { viewModel.moveSelectedLaterToToday() },

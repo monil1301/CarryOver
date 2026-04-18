@@ -9,6 +9,7 @@ import AppKit
 struct SearchKeyBridge: NSViewRepresentable {
     var isEditing: Bool
     var isSearchActive: Bool
+    var isOverlayOpen: Bool = false
     var onActivate: () -> Void
     var onClose: () -> Void
     var onFocusInput: (() -> Void)?
@@ -19,6 +20,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.hostView = v
         context.coordinator.isEditing = isEditing
         context.coordinator.isSearchActive = isSearchActive
+        context.coordinator.isOverlayOpen = isOverlayOpen
         context.coordinator.onActivate = onActivate
         context.coordinator.onClose = onClose
         context.coordinator.onFocusInput = onFocusInput
@@ -29,6 +31,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         context.coordinator.hostView = nsView
         context.coordinator.isEditing = isEditing
         context.coordinator.isSearchActive = isSearchActive
+        context.coordinator.isOverlayOpen = isOverlayOpen
         context.coordinator.onActivate = onActivate
         context.coordinator.onClose = onClose
         context.coordinator.onFocusInput = onFocusInput
@@ -40,6 +43,7 @@ struct SearchKeyBridge: NSViewRepresentable {
         weak var hostView: NSView?
         var isEditing: Bool = false
         var isSearchActive: Bool = false
+        var isOverlayOpen: Bool = false
         var onActivate: (() -> Void)?
         var onClose: (() -> Void)?
         var onFocusInput: (() -> Void)?
@@ -60,10 +64,11 @@ struct SearchKeyBridge: NSViewRepresentable {
 
                 guard !self.isSearchActive else { return event }
 
-                // Cmd+F
+                // Cmd+F — pass through when an overlay is open so the overlay's bridge handles it
                 let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                     .subtracting([.numericPad, .function])
                 if flags == .command && event.keyCode == KeyCode.f {
+                    if self.isOverlayOpen { return event }
                     if !self.isEditing {
                         self.onActivate?()
                         return nil

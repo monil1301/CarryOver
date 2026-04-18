@@ -9,6 +9,7 @@ import AppKit
 struct LaterListKeyBridge: NSViewRepresentable {
     var isOpen: Bool
     var isEditing: Bool
+    var isSearchActive: Bool
     var hasSelection: Bool
     var onReturn: () -> Bool
     var onMoveToToday: () -> Bool
@@ -20,6 +21,7 @@ struct LaterListKeyBridge: NSViewRepresentable {
         context.coordinator.hostView = v
         context.coordinator.isOpen = isOpen
         context.coordinator.isEditing = isEditing
+        context.coordinator.isSearchActive = isSearchActive
         context.coordinator.hasSelection = hasSelection
         context.coordinator.onReturn = onReturn
         context.coordinator.onMoveToToday = onMoveToToday
@@ -33,6 +35,7 @@ struct LaterListKeyBridge: NSViewRepresentable {
         context.coordinator.hostView = nsView
         context.coordinator.isOpen = isOpen
         context.coordinator.isEditing = isEditing
+        context.coordinator.isSearchActive = isSearchActive
         context.coordinator.hasSelection = hasSelection
         context.coordinator.onReturn = onReturn
         context.coordinator.onMoveToToday = onMoveToToday
@@ -46,6 +49,7 @@ struct LaterListKeyBridge: NSViewRepresentable {
         weak var hostView: NSView?
         var isOpen: Bool = false
         var isEditing: Bool = false
+        var isSearchActive: Bool = false
         var hasSelection: Bool = false
         var onReturn: (() -> Bool)?
         var onMoveToToday: (() -> Bool)?
@@ -82,8 +86,8 @@ struct LaterListKeyBridge: NSViewRepresentable {
                     return event
                 }
 
-                // ⌫ — delete selected (only when not editing)
-                if !self.isEditing && flags.isEmpty && event.keyCode == KeyCode.delete {
+                // ⌫ — delete selected (only when not editing or searching)
+                if !self.isEditing && !self.isSearchActive && flags.isEmpty && event.keyCode == KeyCode.delete {
                     self.onDelete?()
                     return nil
                 }
