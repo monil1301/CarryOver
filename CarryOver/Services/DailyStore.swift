@@ -216,6 +216,11 @@ final class DailyStore: ObservableObject {
         save()
     }
 
+    func restoreLater(tasks: [TaskItem]) {
+        laterTasks = tasks
+        saveLater()
+    }
+
     // MARK: - Later
 
     func moveTaskToLater(dayKey: String, taskID: UUID) {

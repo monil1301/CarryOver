@@ -93,6 +93,25 @@ struct LaterView: View {
             }
             .background(ListFocusBridge(token: $viewModel.laterFocusListToken))
 
+            Divider()
+
+            ZStack {
+                if let undo = viewModel.pendingUndo {
+                    UndoToastView(
+                        label: undo.label,
+                        onUndo: { viewModel.performUndo() },
+                        onDismiss: { viewModel.dismissUndo() }
+                    )
+                }
+            }
+            .frame(height: 38)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .background(
+                Color.gray.opacity(viewModel.pendingUndo != nil ? 0.08 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: viewModel.pendingUndo != nil)
+            )
+
             LaterListKeyBridge(
                 isOpen: viewModel.isLaterOpen,
                 isEditing: viewModel.isLaterEditing,

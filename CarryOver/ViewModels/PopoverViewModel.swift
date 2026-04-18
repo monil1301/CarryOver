@@ -9,10 +9,28 @@ import SwiftUI
 internal import Combine
 
 struct UndoAction: Equatable {
-    let dayKey: String
-    let snapshot: DayBucket
+    let dayKey: String?
+    let snapshot: DayBucket?
+    let laterSnapshot: [TaskItem]?
     let label: String
     let selectionToRestore: UUID?
+    let laterSelectionToRestore: UUID?
+
+    init(
+        dayKey: String? = nil,
+        snapshot: DayBucket? = nil,
+        laterSnapshot: [TaskItem]? = nil,
+        label: String,
+        selectionToRestore: UUID? = nil,
+        laterSelectionToRestore: UUID? = nil
+    ) {
+        self.dayKey = dayKey
+        self.snapshot = snapshot
+        self.laterSnapshot = laterSnapshot
+        self.label = label
+        self.selectionToRestore = selectionToRestore
+        self.laterSelectionToRestore = laterSelectionToRestore
+    }
 }
 
 @MainActor
@@ -519,8 +537,22 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func moveTaskToLater(taskID: UUID) {
-        store.moveTaskToLater(dayKey: selectedKey, taskID: taskID)
+        let key = selectedKey
+        guard let bucket = store.days[key],
+              let task = bucket.tasks.first(where: { $0.id == taskID }) else { return }
+        let todaySnapshot = bucket
+        let laterSnapshot = store.laterTasks
+
+        store.moveTaskToLater(dayKey: key, taskID: taskID)
         Analytics.send("task.movedToLater")
+
+        registerUndo(UndoAction(
+            dayKey: key,
+            snapshot: todaySnapshot,
+            laterSnapshot: laterSnapshot,
+            label: "Moved '\(task.text)' to Later",
+            selectionToRestore: taskID
+        ))
     }
 
     @discardableResult
@@ -533,19 +565,46 @@ final class PopoverViewModel: ObservableObject {
     @discardableResult
     func moveSelectedLaterToToday() -> Bool {
         guard let id = laterSelection else { return false }
-        moveLaterToToday(taskID: id)
+        moveSelectedLaterToToday(taskID: id)
         return true
     }
 
     func moveSelectedLaterToToday(taskID: UUID) {
+        guard let task = store.laterTasks.first(where: { $0.id == taskID }) else { return }
+        let todayKey = store.todayKey
+        let todaySnapshot = store.days[todayKey, default: DayBucket()]
+        let laterSnapshot = store.laterTasks
+        let prevLaterSelection = laterSelection
+
         moveLaterToToday(taskID: taskID)
+
+        registerUndo(UndoAction(
+            dayKey: todayKey,
+            snapshot: todaySnapshot,
+            laterSnapshot: laterSnapshot,
+            label: "Moved '\(task.text)' to Today",
+            laterSelectionToRestore: prevLaterSelection
+        ))
     }
 
     func completeLaterTask(taskID: UUID) {
+        guard let task = store.laterTasks.first(where: { $0.id == taskID }) else { return }
+        let todayKey = store.todayKey
+        let todaySnapshot = store.days[todayKey, default: DayBucket()]
+        let laterSnapshot = store.laterTasks
+        let prevLaterSelection = laterSelection
+
         moveLaterToToday(taskID: taskID)
-        let key = store.todayKey
-        store.toggleDone(dayKey: key, taskID: taskID)
+        store.toggleDone(dayKey: todayKey, taskID: taskID)
         Analytics.send("task.completedFromLater")
+
+        registerUndo(UndoAction(
+            dayKey: todayKey,
+            snapshot: todaySnapshot,
+            laterSnapshot: laterSnapshot,
+            label: "Completed '\(task.text)' from Later",
+            laterSelectionToRestore: prevLaterSelection
+        ))
     }
 
     private func moveLaterToToday(taskID: UUID) {
@@ -564,6 +623,8 @@ final class PopoverViewModel: ObservableObject {
 
     func deleteLaterSelected() {
         guard let id = laterSelection else { return }
+        guard let task = store.laterTasks.first(where: { $0.id == id }) else { return }
+        let laterSnapshot = store.laterTasks
         let tasks = laterTasks
         let idx = tasks.firstIndex(where: { $0.id == id })
         store.deleteLaterTask(taskID: id)
@@ -574,10 +635,23 @@ final class PopoverViewModel: ObservableObject {
         } else {
             laterSelection = remaining.first?.id
         }
+
+        registerUndo(UndoAction(
+            laterSnapshot: laterSnapshot,
+            label: "Deleted '\(task.text)'",
+            laterSelectionToRestore: id
+        ))
     }
 
     func deleteLaterTask(taskID: UUID) {
+        guard let task = store.laterTasks.first(where: { $0.id == taskID }) else { return }
+        let laterSnapshot = store.laterTasks
         store.deleteLaterTask(taskID: taskID)
+        registerUndo(UndoAction(
+            laterSnapshot: laterSnapshot,
+            label: "Deleted '\(task.text)'",
+            laterSelectionToRestore: taskID
+        ))
     }
 
     func startLaterEditing(taskID: UUID) {
@@ -601,6 +675,15 @@ final class PopoverViewModel: ObservableObject {
 
     func commitLaterEdit() {
         guard let taskID = laterEditingTaskID else { return }
+
+        if let task = store.laterTasks.first(where: { $0.id == taskID }) {
+            registerUndo(UndoAction(
+                laterSnapshot: store.laterTasks,
+                label: "Edited '\(task.text)'",
+                laterSelectionToRestore: taskID
+            ))
+        }
+
         store.updateLaterTaskText(taskID: taskID, text: laterEditText)
         laterEditingTaskID = nil
         laterEditText = ""
@@ -620,8 +703,19 @@ final class PopoverViewModel: ObservableObject {
 
     func moveLaterSelectedTask(direction: Int) -> Bool {
         guard !isLaterEditing, !isLaterSearchActive,
-              let id = laterSelection else { return false }
+              let id = laterSelection,
+              let task = store.laterTasks.first(where: { $0.id == id }) else { return false }
+
+        let snapshot = store.laterTasks
         store.moveLaterTask(taskID: id, direction: direction)
+
+        if store.laterTasks.map(\.id) != snapshot.map(\.id) {
+            registerUndo(UndoAction(
+                laterSnapshot: snapshot,
+                label: "Moved '\(task.text)'",
+                laterSelectionToRestore: id
+            ))
+        }
         return true
     }
 
@@ -637,7 +731,14 @@ final class PopoverViewModel: ObservableObject {
 
     func endLaterDrag() {
         guard laterDraggingTaskID != nil else { return }
-        if let id = laterDraggingTaskID {
+        if let snapshot = laterDragSnapshot, let id = laterDraggingTaskID {
+            if store.laterTasks.map(\.id) != snapshot.map(\.id) {
+                registerUndo(UndoAction(
+                    laterSnapshot: snapshot,
+                    label: "Reordered tasks",
+                    laterSelectionToRestore: id
+                ))
+            }
             laterSelection = id
         }
         laterDraggingTaskID = nil
@@ -687,9 +788,17 @@ final class PopoverViewModel: ObservableObject {
 
     func performUndo() {
         guard let action = pendingUndo else { return }
-        store.restoreBucket(dayKey: action.dayKey, bucket: action.snapshot)
-        if selectedKey == action.dayKey, let sel = action.selectionToRestore {
+        if let key = action.dayKey, let snapshot = action.snapshot {
+            store.restoreBucket(dayKey: key, bucket: snapshot)
+        }
+        if let laterSnapshot = action.laterSnapshot {
+            store.restoreLater(tasks: laterSnapshot)
+        }
+        if let key = action.dayKey, selectedKey == key, let sel = action.selectionToRestore {
             selection = sel
+        }
+        if let laterSel = action.laterSelectionToRestore {
+            laterSelection = laterSel
         }
         dismissUndo()
         Analytics.send("undo.triggered")
