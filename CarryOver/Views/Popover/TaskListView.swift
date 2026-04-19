@@ -150,6 +150,22 @@ struct TaskListView: View {
             .listRowBackground(Color.clear)
         }
 
+        if viewModel.showLaterNudge {
+            VStack(spacing: 6) {
+                Text("You have \(viewModel.laterCount) task\(viewModel.laterCount == 1 ? "" : "s") in Later.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Button("View Later") { viewModel.openLater() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.blue)
+            }
+            .frame(maxWidth: .infinity)
+            .listRowSeparator(.hidden)
+            .listRowInsets(rowInsets)
+            .listRowBackground(Color.clear)
+        }
+
         if !viewModel.doneTasks.isEmpty {
             if viewModel.isToday {
                 Divider()
@@ -200,28 +216,12 @@ struct TaskListView: View {
             }
         }
 
-        if viewModel.tasks.isEmpty {
-            if viewModel.showLaterNudge {
-                VStack(spacing: 6) {
-                    Text("You have \(viewModel.laterCount) task\(viewModel.laterCount == 1 ? "" : "s") in Later.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                    Button("View Later") { viewModel.openLater() }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.blue)
-                }
-                .frame(maxWidth: .infinity)
+        if viewModel.tasks.isEmpty && !viewModel.showLaterNudge {
+            Text("No tasks for this day.")
+                .foregroundStyle(.secondary)
                 .listRowSeparator(.hidden)
                 .listRowInsets(rowInsets)
                 .listRowBackground(Color.clear)
-            } else {
-                Text("No tasks for this day.")
-                    .foregroundStyle(.secondary)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(rowInsets)
-                    .listRowBackground(Color.clear)
-            }
         }
     }
 }
