@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.7.0]
+
+- Added Import and Export tasks to a JSON file
+- Added configurable rollover cut-off time
+- Auto move tasks to Later after carrying over for a set number of days
+- Minor fixes
+
 ## [v1.6.0]
 
 - Added "Later" bucket to defer tasks to a future day
