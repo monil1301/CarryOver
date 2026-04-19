@@ -29,12 +29,13 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general:  return "gearshape"
         case .hotkey:   return "keyboard"
         case .data:     return "externaldrive"
-        case .advanced: return "slider.horizontal.3"
+        case .advanced: return "gearshape.2"
         }
     }
 }
 
 struct SettingsView: View {
+    let store: DailyStore
     let selfUpdater: SelfUpdater
     let onChange: () -> Void
 
@@ -64,7 +65,7 @@ struct SettingsView: View {
                     case .hotkey:
                         HotkeySettingsTab(onChange: onChange)
                     case .data:
-                        DataSettingsTab()
+                        DataSettingsTab(store: store)
                     case .advanced:
                         AdvancedSettingsTab()
                     }

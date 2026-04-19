@@ -9,7 +9,7 @@ import HotKey
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
-    private let store = DailyStore()
+    let store = DailyStore()
     private var viewModel: PopoverViewModel?
     private var hotKey: HotKey?
 

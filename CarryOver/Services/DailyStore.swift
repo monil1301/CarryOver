@@ -283,6 +283,79 @@ final class DailyStore: ObservableObject {
         saveLater()
     }
 
+    // MARK: - Import
+
+    func applyImport(payload: ExportPayload) -> MergeSummary {
+        var summary = MergeSummary()
+
+        for (dayKey, importedBucket) in payload.days {
+            if var existing = days[dayKey] {
+                summary.daysMerged += 1
+                var byID = Dictionary(uniqueKeysWithValues: existing.tasks.map { ($0.id, $0) })
+                for imported in importedBucket.tasks {
+                    if var local = byID[imported.id] {
+                        if !local.isDone && imported.isDone {
+                            local.isDone = true
+                            local.completedAt = imported.completedAt ?? Date()
+                            byID[imported.id] = local
+                            summary.tasksUpdated += 1
+                        }
+                    } else {
+                        byID[imported.id] = imported
+                        summary.tasksAdded += 1
+                    }
+                }
+                let originalOrder = existing.tasks.map(\.id)
+                var merged: [TaskItem] = []
+                merged.reserveCapacity(byID.count)
+                var seen = Set<UUID>()
+                for id in originalOrder {
+                    if let t = byID[id] { merged.append(t); seen.insert(id) }
+                }
+                for imported in importedBucket.tasks where !seen.contains(imported.id) {
+                    if let t = byID[imported.id] { merged.append(t); seen.insert(imported.id) }
+                }
+                existing.tasks = merged
+                if existing.note.isEmpty && !importedBucket.note.isEmpty {
+                    existing.note = importedBucket.note
+                }
+                days[dayKey] = existing
+                normalizeOrder(dayKey: dayKey)
+            } else {
+                days[dayKey] = importedBucket
+                summary.daysAdded += 1
+                summary.tasksAdded += importedBucket.tasks.count
+                normalizeOrder(dayKey: dayKey)
+            }
+        }
+
+        var laterByID = Dictionary(uniqueKeysWithValues: laterTasks.map { ($0.id, $0) })
+        var laterOrder = laterTasks.map(\.id)
+        for imported in payload.later {
+            if var local = laterByID[imported.id] {
+                if !local.isDone && imported.isDone {
+                    local.isDone = true
+                    local.completedAt = imported.completedAt ?? Date()
+                    laterByID[imported.id] = local
+                    summary.laterUpdated += 1
+                }
+            } else {
+                laterByID[imported.id] = imported
+                laterOrder.append(imported.id)
+                summary.laterAdded += 1
+            }
+        }
+        laterTasks = laterOrder.compactMap { laterByID[$0] }
+
+        save()
+        saveLater()
+        return summary
+    }
+
+    func exportPayloadData() throws -> Data {
+        try ImportExportService.encode(days: days, later: laterTasks)
+    }
+
     // MARK: - Later
 
     func moveTaskToLater(dayKey: String, taskID: UUID) {
