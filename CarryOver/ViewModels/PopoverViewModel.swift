@@ -108,8 +108,8 @@ final class PopoverViewModel: ObservableObject {
     }
 
     var selectedKey: String { store.dayKey(for: selectedDate) }
-    var isToday: Bool { Calendar.current.isDateInToday(selectedDate) }
-    var isYesterday: Bool { Calendar.current.isDateInYesterday(selectedDate) }
+    var isToday: Bool { selectedKey == store.todayKey }
+    var isYesterday: Bool { selectedKey == store.yesterdayKey }
 
     var titleText: String {
         if isToday { return "Today" }
@@ -137,7 +137,7 @@ final class PopoverViewModel: ObservableObject {
 
     func isCarried(_ task: TaskItem) -> Bool {
         guard isToday else { return false }
-        return !Calendar.current.isDateInToday(task.createdAt)
+        return store.effectiveDayKey(for: task.createdAt) != store.todayKey
     }
 
     var laterTasks: [TaskItem] { store.laterTasks }
@@ -165,6 +165,7 @@ final class PopoverViewModel: ObservableObject {
 
     init(store: DailyStore) {
         self.store = store
+        self.selectedDate = store.effectiveNow()
         storeCancellable = store.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -408,7 +409,7 @@ final class PopoverViewModel: ObservableObject {
         if isEditing { cancelEdit() }
         if isSearchActive { closeSearch() }
         if isLaterOpen { closeLater() }
-        selectedDate = Date()
+        selectedDate = store.effectiveNow()
         selection = nil
         focusToken += 1
     }

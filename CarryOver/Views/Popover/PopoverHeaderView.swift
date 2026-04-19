@@ -51,7 +51,7 @@ struct PopoverHeaderView: View {
                             .keyboardShortcut("[", modifiers: [.command])
 
                         Button {
-                            viewModel.selectedDate = Date()
+                            viewModel.selectedDate = viewModel.store.effectiveNow()
                             viewModel.focusToken += 1
                         } label: {
                             Text("Today")

@@ -30,7 +30,23 @@ final class DailyStore: ObservableObject {
         return f
     }()
 
-    var todayKey: String { df.string(from: Date()) }
+    func effectiveNow() -> Date {
+        let hour = RolloverPreferences.currentCutoffHour()
+        return Calendar.current.date(byAdding: .hour, value: -hour, to: Date()) ?? Date()
+    }
+
+    func effectiveDayKey(for date: Date) -> String {
+        let hour = RolloverPreferences.currentCutoffHour()
+        let shifted = Calendar.current.date(byAdding: .hour, value: -hour, to: date) ?? date
+        return df.string(from: shifted)
+    }
+
+    var todayKey: String { df.string(from: effectiveNow()) }
+
+    var yesterdayKey: String {
+        let prev = Calendar.current.date(byAdding: .day, value: -1, to: effectiveNow()) ?? effectiveNow()
+        return df.string(from: prev)
+    }
 
     private var appSupportDir: URL {
         let fm = FileManager.default

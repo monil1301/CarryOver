@@ -10,12 +10,17 @@ struct InlineDatePickerView: View {
     let onDismiss: () -> Void
     var isKeyBridgeActive: Bool = true
 
+    @EnvironmentObject var store: DailyStore
     @State private var displayedMonth: Date = Date()
     @State private var focusedDate: Date? = nil
 
     private let calendar = Calendar.current
     private let weekdaySymbols = Calendar.current.veryShortWeekdaySymbols
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+
+    private var effectiveTodayStart: Date {
+        calendar.startOfDay(for: store.effectiveNow())
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -83,8 +88,8 @@ struct InlineDatePickerView: View {
 
     private func dateCell(_ day: DayInfo) -> some View {
         let isSelected = calendar.isDate(day.date, inSameDayAs: selectedDate)
-        let isToday = calendar.isDateInToday(day.date)
-        let isFuture = day.date > calendar.startOfDay(for: Date())
+        let isToday = store.dayKey(for: day.date) == store.todayKey
+        let isFuture = day.date > effectiveTodayStart
         let isOtherMonth = !calendar.isDate(day.date, equalTo: displayedMonth, toGranularity: .month)
         let isFocused = focusedDate != nil && calendar.isDate(day.date, inSameDayAs: focusedDate!)
 
@@ -157,7 +162,7 @@ struct InlineDatePickerView: View {
     }
 
     private var isCurrentMonth: Bool {
-        calendar.isDate(displayedMonth, equalTo: Date(), toGranularity: .month)
+        calendar.isDate(displayedMonth, equalTo: store.effectiveNow(), toGranularity: .month)
     }
 
     private func shiftMonth(_ delta: Int) {
@@ -168,7 +173,7 @@ struct InlineDatePickerView: View {
 
     private func shiftMonthAndFocus(_ delta: Int) {
         guard let newMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth) else { return }
-        if delta > 0 && calendar.isDate(displayedMonth, equalTo: Date(), toGranularity: .month) { return }
+        if delta > 0 && calendar.isDate(displayedMonth, equalTo: store.effectiveNow(), toGranularity: .month) { return }
         withAnimation(.easeInOut(duration: 0.15)) {
             displayedMonth = newMonth
         }
@@ -180,7 +185,7 @@ struct InlineDatePickerView: View {
         if var comps = Optional(calendar.dateComponents([.year, .month], from: newMonth)) {
             comps.day = clampedDay
             if let newFocus = calendar.date(from: comps) {
-                let today = calendar.startOfDay(for: Date())
+                let today = effectiveTodayStart
                 focusedDate = newFocus > today ? today : newFocus
             }
         }
@@ -189,7 +194,7 @@ struct InlineDatePickerView: View {
     private func moveFocus(byDays delta: Int) {
         let base = focusedDate ?? selectedDate
         guard let newDate = calendar.date(byAdding: .day, value: delta, to: base) else { return }
-        if newDate > calendar.startOfDay(for: Date()) { return }
+        if newDate > effectiveTodayStart { return }
         focusedDate = newDate
         if !calendar.isDate(newDate, equalTo: displayedMonth, toGranularity: .month) {
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -200,7 +205,7 @@ struct InlineDatePickerView: View {
 
     private func confirmFocus() {
         guard let date = focusedDate else { return }
-        if date > calendar.startOfDay(for: Date()) { return }
+        if date > effectiveTodayStart { return }
         selectedDate = date
         onDismiss()
     }
