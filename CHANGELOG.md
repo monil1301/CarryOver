@@ -1,5 +1,15 @@
 # Changelog
 
+## [v1.6.0]
+
+- Added "Later" bucket to defer tasks to a future day
+- Search within Later tasks
+- Undo support for Later actions
+- Later nudge when today is empty or all tasks are completed
+- Added carried-over tag indicator in settings
+- Date picker keyboard support
+- Minor fixes
+
 ## [v1.5.0]
 
 - Auto update modified
