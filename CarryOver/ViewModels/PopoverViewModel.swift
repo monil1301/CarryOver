@@ -11,6 +11,7 @@ internal import Combine
 struct UndoAction: Equatable {
     let dayKey: String?
     let snapshot: DayBucket?
+    let daysSnapshot: [String: DayBucket]?
     let laterSnapshot: [TaskItem]?
     let label: String
     let selectionToRestore: UUID?
@@ -19,6 +20,7 @@ struct UndoAction: Equatable {
     init(
         dayKey: String? = nil,
         snapshot: DayBucket? = nil,
+        daysSnapshot: [String: DayBucket]? = nil,
         laterSnapshot: [TaskItem]? = nil,
         label: String,
         selectionToRestore: UUID? = nil,
@@ -26,6 +28,7 @@ struct UndoAction: Equatable {
     ) {
         self.dayKey = dayKey
         self.snapshot = snapshot
+        self.daysSnapshot = daysSnapshot
         self.laterSnapshot = laterSnapshot
         self.label = label
         self.selectionToRestore = selectionToRestore
@@ -774,6 +777,26 @@ final class PopoverViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Rollover
+
+    func handleRolloverResult(_ result: DailyStore.RolloverResult) {
+        guard result.movedToLaterCount > 0,
+              let daysSnap = result.daysSnapshotForUndo,
+              let laterSnap = result.laterSnapshotForUndo else { return }
+
+        Analytics.send("rollover.movedToLater", with: ["count": "\(result.movedToLaterCount)"])
+
+        let label = result.movedToLaterCount == 1
+            ? "Moved 1 task to Later"
+            : "Moved \(result.movedToLaterCount) tasks to Later"
+
+        registerUndo(UndoAction(
+            daysSnapshot: daysSnap,
+            laterSnapshot: laterSnap,
+            label: label
+        ))
+    }
+
     // MARK: - Undo
 
     func registerUndo(_ action: UndoAction) {
@@ -788,6 +811,9 @@ final class PopoverViewModel: ObservableObject {
 
     func performUndo() {
         guard let action = pendingUndo else { return }
+        if let daysSnapshot = action.daysSnapshot {
+            store.restoreDays(daysSnapshot)
+        }
         if let key = action.dayKey, let snapshot = action.snapshot {
             store.restoreBucket(dayKey: key, bucket: snapshot)
         }

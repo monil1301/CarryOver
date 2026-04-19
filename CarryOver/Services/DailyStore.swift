@@ -11,6 +11,13 @@ internal import Combine
 
 @MainActor
 final class DailyStore: ObservableObject {
+    struct RolloverResult {
+        let carriedCount: Int
+        let movedToLaterCount: Int
+        let daysSnapshotForUndo: [String: DayBucket]?
+        let laterSnapshotForUndo: [TaskItem]?
+    }
+
     @Published private(set) var days: [String: DayBucket] = [:]
     @Published private(set) var laterTasks: [TaskItem] = []
     @Published var resetToken: Int = 0
@@ -37,7 +44,7 @@ final class DailyStore: ObservableObject {
     private var laterFileURL: URL { appSupportDir.appendingPathComponent("later.json") }
 
     @discardableResult
-    func load() -> Int {
+    func load() -> RolloverResult {
         do {
             let data = try Data(contentsOf: fileURL)
             days = try JSONDecoder().decode([String: DayBucket].self, from: data)
@@ -121,16 +128,39 @@ final class DailyStore: ObservableObject {
     }
 
     /// Core feature: unfinished tasks from older days move into today; done tasks stay on their day.
+    /// Tasks older than the auto-move-to-Later threshold are routed to the Later bucket instead.
     @discardableResult
-    func rolloverUnfinishedToToday() -> Int {
+    func rolloverUnfinishedToToday() -> RolloverResult {
         let today = todayKey
+        let threshold = RolloverPreferences.currentThreshold()
+        let now = Date()
+        let cal = Calendar.current
+
+        let daysSnapshot = days
+        let laterSnapshot = laterTasks
+
         var incoming: [TaskItem] = []
+        var toLater: [TaskItem] = []
 
         for (dayKey, bucket) in days {
             guard dayKey < today else { continue } // works because yyyy-MM-dd
             let undone = bucket.tasks.filter { !$0.isDone }
             if !undone.isEmpty {
-                incoming.append(contentsOf: undone)
+                if threshold > 0 {
+                    for task in undone {
+                        let age = cal.dateComponents([.day], from: task.createdAt, to: now).day ?? 0
+                        if age >= threshold {
+                            var copy = task
+                            copy.isDone = false
+                            copy.completedAt = nil
+                            toLater.append(copy)
+                        } else {
+                            incoming.append(task)
+                        }
+                    }
+                } else {
+                    incoming.append(contentsOf: undone)
+                }
                 let doneOnly = bucket.tasks.filter { $0.isDone }
                 days[dayKey]?.tasks = doneOnly
             }
@@ -140,9 +170,25 @@ final class DailyStore: ObservableObject {
             days[today, default: DayBucket()].tasks = incoming + (days[today]?.tasks ?? [])
         }
 
+        if !toLater.isEmpty {
+            laterTasks.append(contentsOf: toLater)
+            saveLater()
+        }
+
         normalizeOrder(dayKey: today)
         save()
-        return incoming.count
+
+        return RolloverResult(
+            carriedCount: incoming.count,
+            movedToLaterCount: toLater.count,
+            daysSnapshotForUndo: toLater.isEmpty ? nil : daysSnapshot,
+            laterSnapshotForUndo: toLater.isEmpty ? nil : laterSnapshot
+        )
+    }
+
+    func restoreDays(_ snapshot: [String: DayBucket]) {
+        days = snapshot
+        save()
     }
     
     func dayKey(for date: Date) -> String { df.string(from: date) }

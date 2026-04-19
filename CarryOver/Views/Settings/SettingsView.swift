@@ -11,6 +11,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case hotkey
     case data
+    case advanced
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general:  return "General"
         case .hotkey:   return "Hotkey"
         case .data:     return "Data"
+        case .advanced: return "Advanced"
         }
     }
 
@@ -27,6 +29,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general:  return "gearshape"
         case .hotkey:   return "keyboard"
         case .data:     return "externaldrive"
+        case .advanced: return "slider.horizontal.3"
         }
     }
 }
@@ -62,6 +65,8 @@ struct SettingsView: View {
                         HotkeySettingsTab(onChange: onChange)
                     case .data:
                         DataSettingsTab()
+                    case .advanced:
+                        AdvancedSettingsTab()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
