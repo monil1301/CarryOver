@@ -103,19 +103,22 @@ final class DailyStore: ObservableObject {
         days[dayKey]?.tasks ?? []
     }
 
-    func addTaskToday(_ text: String) {
+    @discardableResult
+    func addTaskToday(_ text: String) -> UUID? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
+        guard !t.isEmpty else { return nil }
 
         let key = todayKey
         var bucket = days[key, default: DayBucket()]
 
         // Insert at the end of unfinished tasks (right before first done task)
         let insertIndex = bucket.tasks.firstIndex(where: { $0.isDone }) ?? bucket.tasks.count
-        bucket.tasks.insert(TaskItem(text: t), at: insertIndex)
+        let new = TaskItem(text: t)
+        bucket.tasks.insert(new, at: insertIndex)
 
         days[key] = bucket
         save()
+        return new.id
     }
 
     func addTasksToday(_ texts: [String]) {
@@ -297,9 +300,10 @@ final class DailyStore: ObservableObject {
                         if !local.isDone && imported.isDone {
                             local.isDone = true
                             local.completedAt = imported.completedAt ?? Date()
-                            byID[imported.id] = local
                             summary.tasksUpdated += 1
                         }
+                        local.subtasks = mergedSubtasks(local: local.subtasks, imported: imported.subtasks)
+                        byID[imported.id] = local
                     } else {
                         byID[imported.id] = imported
                         summary.tasksAdded += 1
@@ -354,6 +358,189 @@ final class DailyStore: ObservableObject {
 
     func exportPayloadData() throws -> Data {
         try ImportExportService.encode(days: days, later: laterTasks)
+    }
+
+    // MARK: - Subtasks
+
+    /// Toggles a top-level task's done state, cascading the new state to all of its subtasks
+    /// when marking done (stamping completedAt on any that weren't already done).
+    /// Un-marking a parent leaves subtask states alone.
+    func toggleTaskDoneCascading(dayKey: String, taskID: UUID) {
+        guard var bucket = days[dayKey],
+              let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+
+        let newDone = !bucket.tasks[i].isDone
+        bucket.tasks[i].isDone = newDone
+        bucket.tasks[i].completedAt = newDone ? Date() : nil
+
+        if newDone {
+            let now = Date()
+            for s in bucket.tasks[i].subtasks.indices where !bucket.tasks[i].subtasks[s].isDone {
+                bucket.tasks[i].subtasks[s].isDone = true
+                bucket.tasks[i].subtasks[s].completedAt = now
+            }
+            normalizeSubtasksOrder(&bucket.tasks[i].subtasks)
+        }
+
+        days[dayKey] = bucket
+        normalizeOrder(dayKey: dayKey)
+        save()
+    }
+
+    @discardableResult
+    func addSubtask(dayKey: String, parentID: UUID, text: String) -> UUID? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return nil }
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }) else { return nil }
+        let new = Subtask(text: t)
+        bucket.tasks[p].subtasks.append(new)
+        normalizeSubtasksOrder(&bucket.tasks[p].subtasks)
+        days[dayKey] = bucket
+        save()
+        return new.id
+    }
+
+    @discardableResult
+    func insertEmptySubtask(dayKey: String, parentID: UUID) -> UUID? {
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }) else { return nil }
+        let new = Subtask(text: "")
+        // Insert after the last undone subtask so it appears at the end of the undone group.
+        let insertIndex = bucket.tasks[p].subtasks.firstIndex(where: { $0.isDone }) ?? bucket.tasks[p].subtasks.count
+        bucket.tasks[p].subtasks.insert(new, at: insertIndex)
+        days[dayKey] = bucket
+        save()
+        return new.id
+    }
+
+    func updateSubtaskText(dayKey: String, parentID: UUID, subtaskID: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            // Empty text on commit deletes the empty subtask (consistent with insertEmptySubtask flow).
+            deleteSubtask(dayKey: dayKey, parentID: parentID, subtaskID: subtaskID)
+            return
+        }
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }),
+              let s = bucket.tasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        bucket.tasks[p].subtasks[s].text = trimmed
+        days[dayKey] = bucket
+        save()
+    }
+
+    /// Toggles a subtask's done state, sinks completed subtasks to the bottom of the parent's
+    /// subtask array. Returns true if the parent's subtasks are now all-done (caller can use
+    /// this to drive parent auto-completion if the user has the setting enabled).
+    @discardableResult
+    func toggleSubtaskDone(dayKey: String, parentID: UUID, subtaskID: UUID) -> Bool {
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }),
+              let s = bucket.tasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return false }
+        bucket.tasks[p].subtasks[s].isDone.toggle()
+        bucket.tasks[p].subtasks[s].completedAt = bucket.tasks[p].subtasks[s].isDone ? Date() : nil
+        normalizeSubtasksOrder(&bucket.tasks[p].subtasks)
+        let allDone = !bucket.tasks[p].subtasks.isEmpty && bucket.tasks[p].subtasks.allSatisfy { $0.isDone }
+        days[dayKey] = bucket
+        save()
+        return allDone
+    }
+
+    func deleteSubtask(dayKey: String, parentID: UUID, subtaskID: UUID) {
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }) else { return }
+        bucket.tasks[p].subtasks.removeAll { $0.id == subtaskID }
+        days[dayKey] = bucket
+        save()
+    }
+
+    /// Cmd+↑ / Cmd+↓ on a subtask: swap with adjacent sibling within the same done-state group.
+    /// direction: -1 = up, +1 = down. No-op if the subtask is at the boundary of its group.
+    func moveSubtask(dayKey: String, parentID: UUID, subtaskID: UUID, direction: Int) {
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }),
+              let s = bucket.tasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        let subs = bucket.tasks[p].subtasks
+        let newIdx = s + direction
+        guard newIdx >= 0, newIdx < subs.count else { return }
+        // Keep completed subtasks sunk to the bottom: only allow swaps within the same done group.
+        guard subs[s].isDone == subs[newIdx].isDone else { return }
+        bucket.tasks[p].subtasks.swapAt(s, newIdx)
+        days[dayKey] = bucket
+        save()
+    }
+
+    /// Tab key: convert a top-level task into a subtask of the top-level task immediately above
+    /// it in bucket.tasks. Preserves id so selection tracks through the change.
+    /// No-op if there is no task above, or if the task itself has subtasks (depth cap).
+    @discardableResult
+    func indentTaskAsSubtask(dayKey: String, taskID: UUID) -> UUID? {
+        guard var bucket = days[dayKey],
+              let i = bucket.tasks.firstIndex(where: { $0.id == taskID }),
+              i > 0 else { return nil }
+        guard bucket.tasks[i].subtasks.isEmpty else { return nil }
+        let task = bucket.tasks[i]
+        let parentIndex = i - 1
+        let sub = Subtask(id: task.id,
+                          text: task.text,
+                          isDone: task.isDone,
+                          createdAt: task.createdAt,
+                          completedAt: task.completedAt)
+        bucket.tasks.remove(at: i)
+        bucket.tasks[parentIndex].subtasks.append(sub)
+        normalizeSubtasksOrder(&bucket.tasks[parentIndex].subtasks)
+        days[dayKey] = bucket
+        normalizeOrder(dayKey: dayKey)
+        save()
+        return sub.id
+    }
+
+    /// Shift+Tab on a subtask: promote it to a top-level task positioned immediately after the
+    /// parent and its remaining subtasks (i.e. right after the parent's slot in bucket.tasks).
+    /// Preserves id and completion state.
+    func unindentSubtaskToTask(dayKey: String, parentID: UUID, subtaskID: UUID) {
+        guard var bucket = days[dayKey],
+              let p = bucket.tasks.firstIndex(where: { $0.id == parentID }),
+              let s = bucket.tasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        let sub = bucket.tasks[p].subtasks.remove(at: s)
+        let task = TaskItem(id: sub.id,
+                            text: sub.text,
+                            isDone: sub.isDone,
+                            createdAt: sub.createdAt,
+                            completedAt: sub.completedAt,
+                            subtasks: [])
+        bucket.tasks.insert(task, at: p + 1)
+        days[dayKey] = bucket
+        normalizeOrder(dayKey: dayKey)
+        save()
+    }
+
+    private func normalizeSubtasksOrder(_ subtasks: inout [Subtask]) {
+        let undone = subtasks.filter { !$0.isDone }
+        let done = subtasks.filter { $0.isDone }
+        subtasks = undone + done
+    }
+
+    /// Merge imported subtasks into a parent: existing subtasks advance undone→done when the
+    /// import is done; new subtasks append preserving import order.
+    private func mergedSubtasks(local: [Subtask], imported: [Subtask]) -> [Subtask] {
+        var byID = Dictionary(uniqueKeysWithValues: local.map { ($0.id, $0) })
+        var order = local.map(\.id)
+        var seen = Set(order)
+        for sub in imported {
+            if var existing = byID[sub.id] {
+                if !existing.isDone && sub.isDone {
+                    existing.isDone = true
+                    existing.completedAt = sub.completedAt ?? Date()
+                }
+                byID[sub.id] = existing
+            } else {
+                byID[sub.id] = sub
+                order.append(sub.id)
+                seen.insert(sub.id)
+            }
+        }
+        return order.compactMap { byID[$0] }
     }
 
     // MARK: - Later

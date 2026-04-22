@@ -14,6 +14,7 @@ struct GeneralSettingsTab: View {
     @State private var autoCheckForUpdates = UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") as? Bool ?? true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var showCarriedTag = UserDefaults.standard.object(forKey: DisplayPreferences.showCarriedTagKey) as? Bool ?? true
+    @State private var autoCompleteParent = UserDefaults.standard.bool(forKey: SubtaskPreferences.autoCompleteParentKey)
     @State private var isChecking = false
 
     var body: some View {
@@ -40,6 +41,17 @@ struct GeneralSettingsTab: View {
                     .onChange(of: showCarriedTag) { newValue in
                         UserDefaults.standard.set(newValue, forKey: DisplayPreferences.showCarriedTagKey)
                         Analytics.send(newValue ? "settings.showCarriedTag.enabled" : "settings.showCarriedTag.disabled")
+                    }
+            }
+
+            Divider()
+
+            // MARK: Subtasks
+            SettingsSection("Subtasks") {
+                Toggle("Complete parent task when all subtasks are done", isOn: $autoCompleteParent)
+                    .onChange(of: autoCompleteParent) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: SubtaskPreferences.autoCompleteParentKey)
+                        Analytics.send(newValue ? "settings.autoCompleteParent.enabled" : "settings.autoCompleteParent.disabled")
                     }
             }
 

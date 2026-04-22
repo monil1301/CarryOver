@@ -63,6 +63,15 @@ struct TaskListView: View {
             onMoveDown: { viewModel.moveSelectedTask(direction: 1) }
         )
         .frame(width: 0, height: 0)
+
+        if !viewModel.isSearchActive {
+            ListTabKeyBridge(
+                isEditing: viewModel.isEditing,
+                onTab: { viewModel.indentSelectedTask() },
+                onShiftTab: { viewModel.unindentSelectedSubtask() }
+            )
+            .frame(width: 0, height: 0)
+        }
     }
 
     // MARK: - Search results (unified flat list)
@@ -106,48 +115,70 @@ struct TaskListView: View {
 
     @ViewBuilder
     private var normalTaskList: some View {
-        ForEach(viewModel.undoneTasks) { task in
-            TaskRowView(
-                task: task,
-                isEditing: viewModel.editingTaskID == task.id,
-                isSelected: viewModel.selection == task.id,
-                isToday: viewModel.isToday,
-                isCarried: viewModel.isCarried(task),
-                editText: $viewModel.editText,
-                onToggle: { viewModel.toggleDone(taskID: task.id) },
-                onEdit: { viewModel.startEditing(taskID: task.id) },
-                onCommitEdit: { viewModel.commitEdit() },
-                onCancelEdit: { viewModel.cancelEdit() },
-                onDelete: { viewModel.deleteTask(taskID: task.id) },
-                onSelect: { viewModel.selectTask(task.id) },
-                onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
-            )
-            .tag(task.id)
-            .opacity(viewModel.draggingTaskID == task.id ? 0.3 : 1.0)
-            .onDrag {
-                viewModel.beginDrag(taskID: task.id)
-                return NSItemProvider(object: task.id.uuidString as NSString)
-            } preview: {
-                HStack(spacing: 10) {
-                    Image(systemName: "circle")
-                        .foregroundStyle(.secondary)
-                    Text(task.text)
-                    Spacer()
+        ForEach(viewModel.undoneRows) { row in
+            switch row {
+            case .parent(let task):
+                TaskRowView(
+                    task: task,
+                    isEditing: viewModel.editingTaskID == task.id,
+                    isSelected: viewModel.selection == task.id,
+                    isToday: viewModel.isToday,
+                    isCarried: viewModel.isCarried(task),
+                    editText: $viewModel.editText,
+                    onToggle: { viewModel.toggleDone(taskID: task.id) },
+                    onEdit: { viewModel.startEditing(taskID: task.id) },
+                    onCommitEdit: { viewModel.commitEdit() },
+                    onCancelEdit: { viewModel.cancelEdit() },
+                    onDelete: { viewModel.deleteTask(taskID: task.id) },
+                    onSelect: { viewModel.selectTask(task.id) },
+                    onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
+                    onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil
+                )
+                .tag(task.id)
+                .opacity(viewModel.draggingTaskID == task.id ? 0.3 : 1.0)
+                .onDrag {
+                    viewModel.beginDrag(taskID: task.id)
+                    return NSItemProvider(object: task.id.uuidString as NSString)
+                } preview: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle")
+                            .foregroundStyle(.secondary)
+                        Text(task.text)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(width: 280, alignment: .leading)
+                    .background(.background)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(width: 280, alignment: .leading)
-                .background(.background)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                .onDrop(of: [.text], delegate: TaskReorderDropDelegate(
+                    targetTaskID: task.id,
+                    viewModel: viewModel
+                ))
+                .listRowSeparator(.hidden)
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
+
+            case .subtask(_, let subtask):
+                SubtaskRowView(
+                    subtask: subtask,
+                    isEditing: viewModel.editingTaskID == subtask.id,
+                    isSelected: viewModel.selection == subtask.id,
+                    editText: $viewModel.editText,
+                    onToggle: { viewModel.toggleDone(taskID: subtask.id) },
+                    onEdit: { viewModel.startEditing(taskID: subtask.id) },
+                    onCommitEdit: { viewModel.commitEdit() },
+                    onCancelEdit: { viewModel.cancelEdit() },
+                    onDelete: { viewModel.deleteTask(taskID: subtask.id) },
+                    onSelect: { viewModel.selectTask(subtask.id) }
+                )
+                .tag(subtask.id)
+                .listRowSeparator(.hidden)
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
             }
-            .onDrop(of: [.text], delegate: TaskReorderDropDelegate(
-                targetTaskID: task.id,
-                viewModel: viewModel
-            ))
-            .listRowSeparator(.hidden)
-            .listRowInsets(rowInsets)
-            .listRowBackground(Color.clear)
         }
 
         if viewModel.showLaterNudge {
@@ -192,26 +223,48 @@ struct TaskListView: View {
             }
 
             if !viewModel.isToday || !viewModel.isCompletedCollapsed {
-                ForEach(viewModel.doneTasks) { task in
-                    TaskRowView(
-                        task: task,
-                        isEditing: viewModel.editingTaskID == task.id,
-                        isSelected: viewModel.selection == task.id,
-                        isToday: viewModel.isToday,
-                        isCarried: viewModel.isCarried(task),
-                        editText: $viewModel.editText,
-                        onToggle: { viewModel.toggleDone(taskID: task.id) },
-                        onEdit: { viewModel.startEditing(taskID: task.id) },
-                        onCommitEdit: { viewModel.commitEdit() },
-                        onCancelEdit: { viewModel.cancelEdit() },
-                        onDelete: { viewModel.deleteTask(taskID: task.id) },
-                        onSelect: { viewModel.selectTask(task.id) },
-                        onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
-                    )
-                    .tag(task.id)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(rowInsets)
-                    .listRowBackground(Color.clear)
+                ForEach(viewModel.doneRows) { row in
+                    switch row {
+                    case .parent(let task):
+                        TaskRowView(
+                            task: task,
+                            isEditing: viewModel.editingTaskID == task.id,
+                            isSelected: viewModel.selection == task.id,
+                            isToday: viewModel.isToday,
+                            isCarried: viewModel.isCarried(task),
+                            editText: $viewModel.editText,
+                            onToggle: { viewModel.toggleDone(taskID: task.id) },
+                            onEdit: { viewModel.startEditing(taskID: task.id) },
+                            onCommitEdit: { viewModel.commitEdit() },
+                            onCancelEdit: { viewModel.cancelEdit() },
+                            onDelete: { viewModel.deleteTask(taskID: task.id) },
+                            onSelect: { viewModel.selectTask(task.id) },
+                            onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
+                            onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil
+                        )
+                        .tag(task.id)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(rowInsets)
+                        .listRowBackground(Color.clear)
+
+                    case .subtask(_, let subtask):
+                        SubtaskRowView(
+                            subtask: subtask,
+                            isEditing: viewModel.editingTaskID == subtask.id,
+                            isSelected: viewModel.selection == subtask.id,
+                            editText: $viewModel.editText,
+                            onToggle: { viewModel.toggleDone(taskID: subtask.id) },
+                            onEdit: { viewModel.startEditing(taskID: subtask.id) },
+                            onCommitEdit: { viewModel.commitEdit() },
+                            onCancelEdit: { viewModel.cancelEdit() },
+                            onDelete: { viewModel.deleteTask(taskID: subtask.id) },
+                            onSelect: { viewModel.selectTask(subtask.id) }
+                        )
+                        .tag(subtask.id)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(rowInsets)
+                        .listRowBackground(Color.clear)
+                    }
                 }
             }
         }

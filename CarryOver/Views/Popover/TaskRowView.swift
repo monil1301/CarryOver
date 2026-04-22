@@ -22,6 +22,7 @@ struct TaskRowView: View {
     let onDelete: () -> Void
     let onSelect: () -> Void
     var onMoveToLater: (() -> Void)? = nil
+    var onAddSubtask: (() -> Void)? = nil
 
     @FocusState private var fieldFocused: Bool
     @State private var isHovered = false
@@ -64,6 +65,10 @@ struct TaskRowView: View {
                     .foregroundStyle(task.isDone ? .secondary : .primary)
             }
 
+            if !task.subtasks.isEmpty {
+                SubtaskProgressPill(subtasks: task.subtasks)
+            }
+
             Spacer()
 
             if canShowCarriedBadge || canShowDragHandle {
@@ -97,11 +102,36 @@ struct TaskRowView: View {
         .onTapGesture { onSelect() }
         .onHover { isHovered = $0 }
         .contextMenu {
+            if let onAddSubtask {
+                Button("Add Subtask") { onAddSubtask() }
+            }
             Button("Edit") { onEdit() }
             if let onMoveToLater {
                 Button("Move to Later") { onMoveToLater() }
             }
             Button("Delete") { onDelete() }
         }
+    }
+}
+
+/// `n/m` indicator shown after a parent's label when the task has subtasks. Muted by default;
+/// shifts to a green tint once all subtasks are complete.
+private struct SubtaskProgressPill: View {
+    let subtasks: [Subtask]
+
+    private var done: Int { subtasks.filter(\.isDone).count }
+    private var total: Int { subtasks.count }
+    private var allDone: Bool { total > 0 && done == total }
+
+    var body: some View {
+        Text("\(done)/\(total)")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(allDone ? Color.green.opacity(0.9) : Color.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(
+                Capsule()
+                    .fill(allDone ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
+            )
     }
 }

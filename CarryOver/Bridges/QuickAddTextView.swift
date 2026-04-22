@@ -15,7 +15,7 @@ struct QuickAddTextView: NSViewRepresentable {
     var onCommit: () -> Void
     var onMoveToList: () -> Void
     var onMoveToInput: () -> Void
-    var onMultiLinePaste: ([String]) -> Void
+    var onMultiLinePaste: ([PastedEntry]) -> Void
     var onDragEndedOverInput: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -167,7 +167,7 @@ final class CommitTextView: NSTextView {
     var onCommit: (() -> Void)?
     var onMoveToList: (() -> Void)?
     var onMoveToInput: (() -> Void)?
-    var onMultiLinePaste: (([String]) -> Void)?
+    var onMultiLinePaste: (([PastedEntry]) -> Void)?
 
     // Reject task reorder drags — accept the drop to prevent UUID text insertion,
     // but discard the content and notify parent to clear drag state.

@@ -8,6 +8,27 @@
 import SwiftUI
 internal import Combine
 
+/// Row entries consumed by the List. A "parent" is a top-level task; a "subtask" references its
+/// parent by ID so the renderer can look up context (nesting, left border) without storing
+/// redundant state on the subtask itself.
+enum ListRow: Identifiable, Equatable {
+    case parent(TaskItem)
+    case subtask(parentID: UUID, Subtask)
+
+    var id: UUID {
+        switch self {
+        case .parent(let t): return t.id
+        case .subtask(_, let s): return s.id
+        }
+    }
+}
+
+/// Entry produced by paste parsing. Indented lines become `.sub`, non-indented become `.top`.
+enum PastedEntry: Equatable {
+    case top(String)
+    case sub(String)
+}
+
 struct UndoAction: Equatable {
     let dayKey: String?
     let snapshot: DayBucket?
@@ -124,6 +145,55 @@ final class PopoverViewModel: ObservableObject {
     var undoneTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
 
+    /// Flattened row order for the undone section: parent first, then its subtasks.
+    var undoneRows: [ListRow] {
+        undoneTasks.flatMap { t in
+            [ListRow.parent(t)] + t.subtasks.map { .subtask(parentID: t.id, $0) }
+        }
+    }
+
+    /// Flattened row order for the Completed section: done parents + their (all done) subtasks.
+    var doneRows: [ListRow] {
+        doneTasks.flatMap { t in
+            [ListRow.parent(t)] + t.subtasks.map { .subtask(parentID: t.id, $0) }
+        }
+    }
+
+    /// Locate a UUID within the current day's bucket. A single UUID can be either a top-level
+    /// task or a subtask; selection uses the same id space, so callers branch on the result.
+    enum Located: Equatable {
+        case task(index: Int)
+        case subtask(parentIndex: Int, subtaskIndex: Int)
+        case notFound
+    }
+
+    func locate(_ id: UUID, in dayKey: String? = nil) -> Located {
+        let key = dayKey ?? selectedKey
+        guard let bucket = store.days[key] else { return .notFound }
+        if let i = bucket.tasks.firstIndex(where: { $0.id == id }) {
+            return .task(index: i)
+        }
+        for (pi, p) in bucket.tasks.enumerated() {
+            if let si = p.subtasks.firstIndex(where: { $0.id == id }) {
+                return .subtask(parentIndex: pi, subtaskIndex: si)
+            }
+        }
+        return .notFound
+    }
+
+    func parentIDOfSubtask(_ id: UUID, in dayKey: String? = nil) -> UUID? {
+        let key = dayKey ?? selectedKey
+        guard let bucket = store.days[key] else { return nil }
+        for p in bucket.tasks {
+            if p.subtasks.contains(where: { $0.id == id }) { return p.id }
+        }
+        return nil
+    }
+
+    /// Tracks the most recently added top-level task id so `:sub <text>` has a fallback anchor
+    /// when nothing is selected.
+    private var lastAddedTopLevelID: UUID?
+
     var dateSubtitle: String {
         let f = DateFormatter()
         f.locale = Locale.current
@@ -174,24 +244,110 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func addTask() {
-        store.addTaskToday(newText)
+        let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // `:sub <text>` power-user syntax: attach as a subtask if a parent anchor exists.
+        // If no anchor, fall back to a plain top-level task with the prefix kept intact.
+        if let subText = parseSubSyntax(trimmed),
+           let anchorID = subtaskAnchorParentID() {
+            let key = store.todayKey
+            let snapshot = store.days[key, default: DayBucket()]
+            if store.addSubtask(dayKey: key, parentID: anchorID, text: subText) != nil {
+                registerUndo(UndoAction(
+                    dayKey: key,
+                    snapshot: snapshot,
+                    label: "Added subtask",
+                    selectionToRestore: selection
+                ))
+                Analytics.send("subtask.added", with: ["method": "syntax"])
+                newText = ""
+                focusToken += 1
+                return
+            }
+        }
+
+        if let newID = store.addTaskToday(trimmed) {
+            lastAddedTopLevelID = newID
+        }
         newText = ""
         focusToken += 1
         Analytics.send("task.added")
     }
 
-    func addTasksFromPaste(_ texts: [String]) {
-        let key = selectedKey
+    /// Returns the content after `:sub ` (case-insensitive) when the input matches, else nil.
+    /// Requires a whitespace separator after the prefix so e.g. `:subject` is not misparsed.
+    private func parseSubSyntax(_ trimmed: String) -> String? {
+        let prefix = ":sub"
+        guard trimmed.lowercased().hasPrefix(prefix) else { return nil }
+        let after = trimmed.dropFirst(prefix.count)
+        guard let first = after.first, first == " " || first == "\t" else { return nil }
+        let content = after.drop(while: { $0.isWhitespace })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
+    }
+
+    /// Anchor selection for `:sub` syntax. Priority:
+    /// 1. Currently selected task (or parent of a selected subtask).
+    /// 2. Most recently added top-level task in the current session.
+    /// 3. Last undone top-level task in today's bucket, so the syntax works out of the box
+    ///    on a freshly opened app with only rolled-over tasks.
+    /// 4. Last top-level task of any state, as a final fallback.
+    private func subtaskAnchorParentID() -> UUID? {
+        let key = store.todayKey
+        if let sel = selection {
+            switch locate(sel, in: key) {
+            case .task(let i):
+                return store.days[key]?.tasks[i].id
+            case .subtask(let pi, _):
+                return store.days[key]?.tasks[pi].id
+            case .notFound:
+                break
+            }
+        }
+        if let last = lastAddedTopLevelID,
+           store.days[key]?.tasks.contains(where: { $0.id == last }) == true {
+            return last
+        }
+        if let lastUndone = store.days[key]?.tasks.last(where: { !$0.isDone }) {
+            return lastUndone.id
+        }
+        return store.days[key]?.tasks.last?.id
+    }
+
+    func addTasksFromPaste(_ entries: [PastedEntry]) {
+        guard !entries.isEmpty else { return }
+        let key = store.todayKey
         let snapshot = store.days[key, default: DayBucket()]
 
-        store.addTasksToday(texts)
+        var currentParentID: UUID?
+        var subtaskCount = 0
+        for entry in entries {
+            switch entry {
+            case .top(let text):
+                if let id = store.addTaskToday(text) {
+                    currentParentID = id
+                    lastAddedTopLevelID = id
+                }
+            case .sub(let text):
+                if let parentID = currentParentID {
+                    if store.addSubtask(dayKey: key, parentID: parentID, text: text) != nil {
+                        subtaskCount += 1
+                    }
+                } else if let id = store.addTaskToday(text) {
+                    // Indented line with no preceding top-level entry degrades to top-level.
+                    currentParentID = id
+                    lastAddedTopLevelID = id
+                }
+            }
+        }
 
-        let count = store.tasks(for: key).count - snapshot.tasks.count
+        let count = store.tasks(for: key).count - snapshot.tasks.count + subtaskCount
         if count > 0 {
             registerUndo(UndoAction(
                 dayKey: key,
                 snapshot: snapshot,
-                label: "\(count) tasks added",
+                label: count == 1 ? "1 task added" : "\(count) tasks added",
                 selectionToRestore: selection
             ))
         }
@@ -199,34 +355,41 @@ final class PopoverViewModel: ObservableObject {
         newText = ""
         focusToken += 1
         Analytics.send("pasteAsTasks.used")
+        if subtaskCount > 0 {
+            for _ in 0..<subtaskCount {
+                Analytics.send("subtask.added", with: ["method": "paste"])
+            }
+        }
     }
 
-    static func parsePastedTasks(_ text: String) -> [String] {
+    static func parsePastedTasks(_ text: String) -> [PastedEntry] {
         let markerPattern = try! NSRegularExpression(pattern: #"^(\s*)([-*•+]|\[[ xX]\]|\d+[.)]) +(.*)"#)
         let lines = text.components(separatedBy: .newlines)
-        var results: [String] = []
+        var results: [PastedEntry] = []
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
 
+            let isIndented = (line.first == " " || line.first == "\t")
+            let content: String
             let range = NSRange(line.startIndex..., in: line)
             if let match = markerPattern.firstMatch(in: line, range: range) {
-                let taskText = String(line[Range(match.range(at: 3), in: line)!])
-                if !taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    results.append(taskText)
-                }
+                content = String(line[Range(match.range(at: 3), in: line)!])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
-                let leadingWhitespace = line.prefix(while: { $0 == " " || $0 == "\t" })
-                if !leadingWhitespace.isEmpty && !results.isEmpty {
-                    results[results.count - 1] += "\n" + trimmed
-                } else {
-                    results.append(trimmed)
-                }
+                content = trimmed
+            }
+            guard !content.isEmpty else { continue }
+
+            if isIndented, !results.isEmpty {
+                results.append(.sub(content))
+            } else {
+                results.append(.top(content))
             }
         }
 
-        return results.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return results
     }
 
     func shiftDay(_ delta: Int) {
@@ -241,14 +404,37 @@ final class PopoverViewModel: ObservableObject {
 
     func toggleDone(taskID: UUID) {
         let key = selectedKey
-        if let bucket = store.days[key],
-           let task = bucket.tasks.first(where: { $0.id == taskID }) {
+        guard let bucket = store.days[key] else { return }
+
+        switch locate(taskID, in: key) {
+        case .task(let i):
+            let task = bucket.tasks[i]
             let label = task.isDone ? "Unmarked '\(task.text)'" : "Completed '\(task.text)'"
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
             if !task.isDone { Analytics.send("task.completed") }
+            store.toggleTaskDoneCascading(dayKey: key, taskID: taskID)
+            pinTaskInSearch(taskID)
+
+        case .subtask(let pi, let si):
+            let parent = bucket.tasks[pi]
+            let sub = parent.subtasks[si]
+            let label = sub.isDone ? "Unmarked subtask" : "Completed subtask"
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
+            let wasDone = sub.isDone
+            let allDone = store.toggleSubtaskDone(dayKey: key, parentID: parent.id, subtaskID: taskID)
+            if !wasDone { Analytics.send("subtask.completed") }
+            // Auto-complete parent if the setting is on and the subtask flip made all-done true.
+            if !wasDone, allDone,
+               SubtaskPreferences.currentAutoCompleteParent(),
+               let refreshed = store.days[key]?.tasks.first(where: { $0.id == parent.id }),
+               !refreshed.isDone {
+                store.toggleTaskDoneCascading(dayKey: key, taskID: parent.id)
+                Analytics.send("parent.autoCompleted")
+            }
+
+        case .notFound:
+            return
         }
-        store.toggleDone(dayKey: key, taskID: taskID)
-        pinTaskInSearch(taskID)
     }
 
     func toggleSelectedDone() -> Bool {
@@ -258,9 +444,19 @@ final class PopoverViewModel: ObservableObject {
     }
 
     func startEditing(taskID: UUID) {
-        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
-        editingTaskID = taskID
-        editText = task.text
+        let key = selectedKey
+        switch locate(taskID, in: key) {
+        case .task(let i):
+            guard let bucket = store.days[key] else { return }
+            editingTaskID = taskID
+            editText = bucket.tasks[i].text
+        case .subtask(let pi, let si):
+            guard let bucket = store.days[key] else { return }
+            editingTaskID = taskID
+            editText = bucket.tasks[pi].subtasks[si].text
+        case .notFound:
+            return
+        }
     }
 
     func startEditingSelected() -> Bool {
@@ -273,17 +469,32 @@ final class PopoverViewModel: ObservableObject {
         guard let taskID = editingTaskID else { return }
         let key = selectedKey
 
-        if let bucket = store.days[key],
-           let task = bucket.tasks.first(where: { $0.id == taskID }) {
-            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Edited '\(task.text)'", selectionToRestore: taskID))
+        switch locate(taskID, in: key) {
+        case .task:
+            if let bucket = store.days[key],
+               let task = bucket.tasks.first(where: { $0.id == taskID }) {
+                registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Edited '\(task.text)'", selectionToRestore: taskID))
+            }
+            store.updateTaskText(dayKey: key, taskID: taskID, text: editText)
+            pinTaskInSearch(taskID)
+            Analytics.send("task.edited")
+
+        case .subtask(let pi, _):
+            guard let bucket = store.days[key] else {
+                editingTaskID = nil; editText = ""; focusListToken += 1
+                return
+            }
+            let parentID = bucket.tasks[pi].id
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Edited subtask", selectionToRestore: taskID))
+            store.updateSubtaskText(dayKey: key, parentID: parentID, subtaskID: taskID, text: editText)
+
+        case .notFound:
+            break
         }
 
-        store.updateTaskText(dayKey: key, taskID: taskID, text: editText)
-        pinTaskInSearch(taskID)
         editingTaskID = nil
         editText = ""
         focusListToken += 1
-        Analytics.send("task.edited")
     }
 
     func cancelEdit() {
@@ -298,7 +509,30 @@ final class PopoverViewModel: ObservableObject {
         guard let id = selection, !isCompletedHeaderSelected else { return }
         let key = selectedKey
 
-        // Capture index before delete for selection logic
+        switch locate(id, in: key) {
+        case .subtask(let pi, let si):
+            guard let bucket = store.days[key] else { return }
+            let parentID = bucket.tasks[pi].id
+            let siblings = bucket.tasks[pi].subtasks
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted subtask", selectionToRestore: id))
+            store.deleteSubtask(dayKey: key, parentID: parentID, subtaskID: id)
+            Analytics.send("subtask.deleted")
+
+            // Prefer next sibling, then previous, else fall back to the parent.
+            let nextID: UUID? = {
+                if si + 1 < siblings.count { return siblings[si + 1].id }
+                if si - 1 >= 0 { return siblings[si - 1].id }
+                return parentID
+            }()
+            selection = nextID
+            focusListToken += 1
+            return
+
+        case .task, .notFound:
+            break
+        }
+
+        // Top-level delete (original behavior).
         let listBeforeDelete: [TaskItem] = isSearchActive ? searchResults : store.tasks(for: key)
         let idx = listBeforeDelete.firstIndex(where: { $0.id == id })
 
@@ -333,32 +567,128 @@ final class PopoverViewModel: ObservableObject {
 
     func deleteTask(taskID: UUID) {
         let key = selectedKey
-        if let bucket = store.days[key],
-           let task = bucket.tasks.first(where: { $0.id == taskID }) {
-            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
+        switch locate(taskID, in: key) {
+        case .subtask(let pi, _):
+            guard let bucket = store.days[key] else { return }
+            let parentID = bucket.tasks[pi].id
+            registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted subtask", selectionToRestore: selection))
+            store.deleteSubtask(dayKey: key, parentID: parentID, subtaskID: taskID)
+            Analytics.send("subtask.deleted")
+
+        case .task:
+            if let bucket = store.days[key],
+               let task = bucket.tasks.first(where: { $0.id == taskID }) {
+                registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: "Deleted '\(task.text)'", selectionToRestore: selection))
+            }
+            store.deleteTask(dayKey: key, taskID: taskID)
+            searchSessionPinnedIDs.remove(taskID)
+            Analytics.send("task.deleted")
+
+        case .notFound:
+            break
         }
-        store.deleteTask(dayKey: key, taskID: taskID)
-        searchSessionPinnedIDs.remove(taskID)
-        Analytics.send("task.deleted")
     }
 
     func moveSelectedTask(direction: Int) -> Bool {
         guard isToday, !isEditing, !isSearchActive,
-              let id = selection, !isCompletedHeaderSelected,
-              let task = undoneTasks.first(where: { $0.id == id }),
-              !task.isDone else { return false }
+              let id = selection, !isCompletedHeaderSelected else { return false }
 
         let key = selectedKey
-        let snapshot = store.days[key, default: DayBucket()]
-        store.moveTask(dayKey: key, taskID: id, direction: direction)
+        switch locate(id, in: key) {
+        case .subtask(let pi, _):
+            guard let bucket = store.days[key] else { return false }
+            let parentID = bucket.tasks[pi].id
+            let snapshot = bucket
+            store.moveSubtask(dayKey: key, parentID: parentID, subtaskID: id, direction: direction)
+            if let newBucket = store.days[key],
+               newBucket.tasks[pi].subtasks.map(\.id) != snapshot.tasks[pi].subtasks.map(\.id) {
+                registerUndo(UndoAction(dayKey: key, snapshot: snapshot, label: "Moved subtask", selectionToRestore: id))
+            }
+            return true
 
-        // Check if move actually happened
-        let newTasks = store.tasks(for: key)
-        if newTasks.map(\.id) != snapshot.tasks.map(\.id) {
-            registerUndo(UndoAction(dayKey: key, snapshot: snapshot, label: "Moved '\(task.text)'", selectionToRestore: id))
+        case .task:
+            guard let task = undoneTasks.first(where: { $0.id == id }), !task.isDone else { return false }
+            let snapshot = store.days[key, default: DayBucket()]
+            store.moveTask(dayKey: key, taskID: id, direction: direction)
+            let newTasks = store.tasks(for: key)
+            if newTasks.map(\.id) != snapshot.tasks.map(\.id) {
+                registerUndo(UndoAction(dayKey: key, snapshot: snapshot, label: "Moved '\(task.text)'", selectionToRestore: id))
+            }
+            return true
+
+        case .notFound:
+            return false
         }
+    }
+
+    // MARK: - Subtask indent / unindent / add
+
+    /// Tab key handler. Indents the selected top-level task as a subtask of the task above it.
+    /// Returns true if the bridge should consume the Tab event.
+    @discardableResult
+    func indentSelectedTask() -> Bool {
+        guard isToday, !isEditing, !isSearchActive,
+              let id = selection, !isCompletedHeaderSelected else { return false }
+        let key = selectedKey
+        guard case .task(let i) = locate(id, in: key), i > 0 else { return false }
+        guard let bucket = store.days[key] else { return false }
+        // Subtask depth is 1: do not indent a task that already owns subtasks.
+        guard bucket.tasks[i].subtasks.isEmpty else { return false }
+
+        let snapshot = bucket
+        if store.indentTaskAsSubtask(dayKey: key, taskID: id) != nil {
+            registerUndo(UndoAction(
+                dayKey: key,
+                snapshot: snapshot,
+                label: "Moved to subtask",
+                selectionToRestore: id
+            ))
+            Analytics.send("subtask.added", with: ["method": "tab"])
+            focusListToken += 1
+            return true
+        }
+        return false
+    }
+
+    /// Shift+Tab handler. Promotes the selected subtask to a top-level task immediately after
+    /// its former parent's remaining subtasks. Returns true if the bridge should consume.
+    @discardableResult
+    func unindentSelectedSubtask() -> Bool {
+        guard isToday, !isEditing, !isSearchActive,
+              let id = selection, !isCompletedHeaderSelected else { return false }
+        let key = selectedKey
+        guard case .subtask(let pi, _) = locate(id, in: key) else { return false }
+        guard let bucket = store.days[key] else { return false }
+        let parentID = bucket.tasks[pi].id
+        let snapshot = bucket
+        store.unindentSubtaskToTask(dayKey: key, parentID: parentID, subtaskID: id)
+        registerUndo(UndoAction(
+            dayKey: key,
+            snapshot: snapshot,
+            label: "Unindented subtask",
+            selectionToRestore: id
+        ))
+        focusListToken += 1
         return true
     }
+
+    /// Right-click "Add Subtask" menu action. Appends an empty subtask and opens inline edit.
+    func addSubtaskFromContextMenu(parentID: UUID) {
+        let key = selectedKey
+        guard let snapshot = store.days[key] else { return }
+        guard let newID = store.insertEmptySubtask(dayKey: key, parentID: parentID) else { return }
+        registerUndo(UndoAction(
+            dayKey: key,
+            snapshot: snapshot,
+            label: "Added subtask",
+            selectionToRestore: selection
+        ))
+        Analytics.send("subtask.added", with: ["method": "rightclick"])
+        selection = newID
+        startEditing(taskID: newID)
+    }
+
+    // MARK: -
 
     func reorderUndoneTasks(fromOffsets: IndexSet, toOffset: Int) {
         guard isToday, !isEditing, !isSearchActive else { return }

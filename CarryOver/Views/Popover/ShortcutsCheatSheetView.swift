@@ -31,6 +31,7 @@ struct ShortcutsCheatSheetView: View {
                     ("Edit task", ["⏎", "Return"]),
                     ("Delete task", ["⌫", "Delete"]),
                     ("Toggle complete", ["Space"]),
+                    ("Create subtask", [":sub", "<text>"]),
                     ("Search", ["⌘", "F"]),
                     ("Move to Later", ["⌘", "⇧", "L"]),
                     ("Move up", ["⌘", "↑"]),
