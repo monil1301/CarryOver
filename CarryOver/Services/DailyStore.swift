@@ -599,4 +599,48 @@ final class DailyStore: ObservableObject {
         laterTasks[i].text = trimmed
         saveLater()
     }
+
+    // MARK: - Later subtasks
+
+    /// Toggle a subtask's done state inside a Later parent. Completion sinks to the bottom of
+    /// the parent's subtask array, matching the today-side behavior.
+    func toggleLaterSubtaskDone(parentID: UUID, subtaskID: UUID) {
+        guard let p = laterTasks.firstIndex(where: { $0.id == parentID }),
+              let s = laterTasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        laterTasks[p].subtasks[s].isDone.toggle()
+        laterTasks[p].subtasks[s].completedAt = laterTasks[p].subtasks[s].isDone ? Date() : nil
+        normalizeSubtasksOrder(&laterTasks[p].subtasks)
+        saveLater()
+    }
+
+    func updateLaterSubtaskText(parentID: UUID, subtaskID: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            deleteLaterSubtask(parentID: parentID, subtaskID: subtaskID)
+            return
+        }
+        guard let p = laterTasks.firstIndex(where: { $0.id == parentID }),
+              let s = laterTasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        laterTasks[p].subtasks[s].text = trimmed
+        saveLater()
+    }
+
+    func deleteLaterSubtask(parentID: UUID, subtaskID: UUID) {
+        guard let p = laterTasks.firstIndex(where: { $0.id == parentID }) else { return }
+        laterTasks[p].subtasks.removeAll { $0.id == subtaskID }
+        saveLater()
+    }
+
+    /// Cmd+↑/↓ on a Later subtask. Clamped to same-done-state siblings so completed subtasks
+    /// stay pinned to the bottom.
+    func moveLaterSubtask(parentID: UUID, subtaskID: UUID, direction: Int) {
+        guard let p = laterTasks.firstIndex(where: { $0.id == parentID }),
+              let s = laterTasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return }
+        let subs = laterTasks[p].subtasks
+        let newIdx = s + direction
+        guard newIdx >= 0, newIdx < subs.count else { return }
+        guard subs[s].isDone == subs[newIdx].isDone else { return }
+        laterTasks[p].subtasks.swapAt(s, newIdx)
+        saveLater()
+    }
 }

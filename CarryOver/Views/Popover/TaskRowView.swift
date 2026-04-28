@@ -23,6 +23,13 @@ struct TaskRowView: View {
     let onSelect: () -> Void
     var onMoveToLater: (() -> Void)? = nil
     var onAddSubtask: (() -> Void)? = nil
+    /// When true, the row renders with a subtle accent tint to signal that it is the live
+    /// match for the currently composed `:sub <parent>` query in the input.
+    var isSubSyntaxHintMatch: Bool = false
+    /// Whether this parent's subtasks are currently hidden. Drives the chevron direction on
+    /// the progress pill.
+    var isCollapsed: Bool = false
+    var onToggleCollapse: (() -> Void)? = nil
 
     @FocusState private var fieldFocused: Bool
     @State private var isHovered = false
@@ -38,6 +45,12 @@ struct TaskRowView: View {
 
     private var canShowCarriedBadge: Bool {
         isCarried && !task.isDone && showCarriedTag
+    }
+
+    private var rowBackground: Color {
+        if isSubSyntaxHintMatch { return Color.accentColor.opacity(0.10) }
+        if isHovered { return Color.gray.opacity(0.06) }
+        return Color.clear
     }
 
     var body: some View {
@@ -66,7 +79,11 @@ struct TaskRowView: View {
             }
 
             if !task.subtasks.isEmpty {
-                SubtaskProgressPill(subtasks: task.subtasks)
+                SubtaskProgressPill(
+                    subtasks: task.subtasks,
+                    isCollapsed: isCollapsed,
+                    onToggle: { onToggleCollapse?() }
+                )
             }
 
             Spacer()
@@ -95,8 +112,17 @@ struct TaskRowView: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.gray.opacity(0.06) : Color.clear)
+                .fill(rowBackground)
         )
+        .overlay(alignment: .leading) {
+            if isSubSyntaxHintMatch {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+                    .padding(.vertical, 2)
+            }
+        }
+        .animation(.easeInOut(duration: 0.12), value: isSubSyntaxHintMatch)
         .onHover { isHovered = $0 }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
@@ -114,24 +140,32 @@ struct TaskRowView: View {
     }
 }
 
-/// `n/m` indicator shown after a parent's label when the task has subtasks. Muted by default;
-/// shifts to a green tint once all subtasks are complete.
-private struct SubtaskProgressPill: View {
+/// `▸ n/m` (collapsed) or `▾ n/m` (expanded) indicator shown after a parent's label when it
+/// has subtasks. Clickable to toggle collapse; muted normally, green tint when all done.
+struct SubtaskProgressPill: View {
     let subtasks: [Subtask]
+    let isCollapsed: Bool
+    let onToggle: () -> Void
 
     private var done: Int { subtasks.filter(\.isDone).count }
     private var total: Int { subtasks.count }
     private var allDone: Bool { total > 0 && done == total }
 
     var body: some View {
-        Text("\(done)/\(total)")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(allDone ? Color.green.opacity(0.9) : Color.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(
-                Capsule()
-                    .fill(allDone ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
-            )
+        HStack(spacing: 3) {
+            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+            Text("\(done)/\(total)")
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(allDone ? Color.green.opacity(0.9) : Color.secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
+        .background(
+            Capsule()
+                .fill(allDone ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
+        )
+        .contentShape(Capsule())
+        .onTapGesture { onToggle() }
     }
 }

@@ -55,7 +55,7 @@ struct SubtaskRowView: View {
                     Text(subtask.text)
                         .font(.system(size: 13.5, weight: .medium))
                         .strikethrough(subtask.isDone)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(subtask.isDone ? .tertiary : .secondary)
                 }
 
                 Spacer()

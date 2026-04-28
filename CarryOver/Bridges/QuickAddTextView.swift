@@ -16,6 +16,7 @@ struct QuickAddTextView: NSViewRepresentable {
     var onMoveToList: () -> Void
     var onMoveToInput: () -> Void
     var onMultiLinePaste: ([PastedEntry]) -> Void
+    var onTabComplete: () -> Bool
     var onDragEndedOverInput: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -37,6 +38,7 @@ struct QuickAddTextView: NSViewRepresentable {
         textView.onMoveToList = onMoveToList
         textView.onMoveToInput = onMoveToInput
         textView.onMultiLinePaste = onMultiLinePaste
+        textView.onTabComplete = onTabComplete
         textView.onDragEndedOverInput = onDragEndedOverInput
 
         textView.isRichText = false
@@ -100,8 +102,13 @@ struct QuickAddTextView: NSViewRepresentable {
         guard let tv = context.coordinator.textView else { return }
         if tv.string != text {
             tv.string = text
+            // Setting `string` clears attributed ranges; re-run the italic pass.
+            Coordinator.applySubSyntaxStyling(tv: tv)
         }
         context.coordinator.updatePlaceholderVisibility(currentText: tv.string)
+        if let commit = tv as? CommitTextView {
+            commit.onTabComplete = onTabComplete
+        }
         if context.coordinator.lastFocusToken != focusToken {
             context.coordinator.lastFocusToken = focusToken
             DispatchQueue.main.async {
@@ -128,6 +135,34 @@ struct QuickAddTextView: NSViewRepresentable {
             guard let tv = notification.object as? NSTextView else { return }
             text = tv.string
             updatePlaceholderVisibility(currentText: tv.string)
+            Coordinator.applySubSyntaxStyling(tv: tv)
+        }
+
+        /// Italicizes ` :sub ...` (case-insensitive) in the input to signal that the subtask
+        /// syntax has been recognized. Separator runs from `:sub` through the end of the text.
+        static func applySubSyntaxStyling(tv: NSTextView) {
+            guard let storage = tv.textStorage else { return }
+            let normalFont = tv.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+            let fullRange = NSRange(location: 0, length: storage.length)
+            storage.beginEditing()
+            storage.setAttributes([
+                .font: normalFont,
+                .foregroundColor: NSColor.labelColor
+            ], range: fullRange)
+
+            let nsString = storage.string as NSString
+            let subRange = nsString.range(of: " :sub", options: .caseInsensitive)
+            if subRange.location != NSNotFound, subRange.location + 1 < storage.length {
+                // Italic begins at `:sub` (skip the leading space) and runs to the end.
+                let italicStart = subRange.location + 1
+                let italicRange = NSRange(location: italicStart, length: storage.length - italicStart)
+                let italicFont = NSFontManager.shared.convert(normalFont, toHaveTrait: .italicFontMask)
+                storage.setAttributes([
+                    .font: italicFont,
+                    .foregroundColor: NSColor.secondaryLabelColor
+                ], range: italicRange)
+            }
+            storage.endEditing()
         }
 
         func updatePlaceholderVisibility(currentText: String) {
@@ -168,6 +203,10 @@ final class CommitTextView: NSTextView {
     var onMoveToList: (() -> Void)?
     var onMoveToInput: (() -> Void)?
     var onMultiLinePaste: (([PastedEntry]) -> Void)?
+    /// Tab handler that tries to autocomplete the current `:sub <parent>` query. Returns true
+    /// when a completion was applied so the key press is consumed; false lets Tab fall through
+    /// to the default "move focus to list" behavior.
+    var onTabComplete: (() -> Bool)?
 
     // Reject task reorder drags — accept the drop to prevent UUID text insertion,
     // but discard the content and notify parent to clear drag state.
@@ -216,8 +255,10 @@ final class CommitTextView: NSTextView {
         if event.keyCode == KeyCode.tab {
             if event.modifierFlags.contains(.shift) {
                 onMoveToInput?()   // Shift+Tab
+            } else if onTabComplete?() == true {
+                return              // Autocompletion took the Tab.
             } else {
-                onMoveToList?()    // Tab
+                onMoveToList?()    // Tab (default: move focus to list)
             }
             return
         }

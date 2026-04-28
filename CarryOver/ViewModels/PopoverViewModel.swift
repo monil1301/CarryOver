@@ -29,6 +29,13 @@ enum PastedEntry: Equatable {
     case sub(String)
 }
 
+/// Autocomplete hint surfaced under the input while the user is composing `<text> :sub <parent>`.
+/// `parentMatch` is nil when the query doesn't match any top-level task yet.
+struct SubSyntaxHint: Equatable {
+    let parentMatch: TaskItem?
+    let rawQuery: String
+}
+
 struct UndoAction: Equatable {
     let dayKey: String?
     let snapshot: DayBucket?
@@ -145,17 +152,27 @@ final class PopoverViewModel: ObservableObject {
     var undoneTasks: [TaskItem] { tasks.filter { !$0.isDone } }
     var doneTasks: [TaskItem] { tasks.filter { $0.isDone } }
 
-    /// Flattened row order for the undone section: parent first, then its subtasks.
+    /// Flattened row order for the undone section: parent first, then its subtasks (skipped
+    /// when the parent is collapsed).
     var undoneRows: [ListRow] {
         undoneTasks.flatMap { t in
-            [ListRow.parent(t)] + t.subtasks.map { .subtask(parentID: t.id, $0) }
+            var rows: [ListRow] = [.parent(t)]
+            if !collapsedParentIDs.contains(t.id) {
+                rows.append(contentsOf: t.subtasks.map { .subtask(parentID: t.id, $0) })
+            }
+            return rows
         }
     }
 
-    /// Flattened row order for the Completed section: done parents + their (all done) subtasks.
+    /// Flattened row order for the Completed section: done parents + their subtasks (skipped
+    /// when the parent is collapsed).
     var doneRows: [ListRow] {
         doneTasks.flatMap { t in
-            [ListRow.parent(t)] + t.subtasks.map { .subtask(parentID: t.id, $0) }
+            var rows: [ListRow] = [.parent(t)]
+            if !collapsedParentIDs.contains(t.id) {
+                rows.append(contentsOf: t.subtasks.map { .subtask(parentID: t.id, $0) })
+            }
+            return rows
         }
     }
 
@@ -194,6 +211,56 @@ final class PopoverViewModel: ObservableObject {
     /// when nothing is selected.
     private var lastAddedTopLevelID: UUID?
 
+    /// Parents whose subtask rows are hidden from the flattened list. Ephemeral — cleared on
+    /// relaunch, matching the lightweight feel of the utility.
+    private var collapsedParentIDs: Set<UUID> = [] {
+        didSet { sendChange() }
+    }
+
+    func isParentCollapsed(_ id: UUID) -> Bool {
+        collapsedParentIDs.contains(id)
+    }
+
+    /// Click handler on the progress pill. Toggles collapse and, when hiding subtasks, pulls
+    /// selection back to the parent so it never ends up pointing into a hidden row.
+    func toggleParentCollapse(_ parentID: UUID) {
+        guard let bucket = store.days[selectedKey],
+              let task = bucket.tasks.first(where: { $0.id == parentID }),
+              !task.subtasks.isEmpty else { return }
+        if collapsedParentIDs.contains(parentID) {
+            collapsedParentIDs.remove(parentID)
+        } else {
+            if let sel = selection, task.subtasks.contains(where: { $0.id == sel }) {
+                selection = parentID
+            }
+            collapsedParentIDs.insert(parentID)
+        }
+    }
+
+    /// Left arrow: collapse the selected parent when it has subtasks and is currently expanded.
+    @discardableResult
+    func collapseSelectedParent() -> Bool {
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
+        guard case .task = locate(id) else { return false }
+        guard let task = store.days[selectedKey]?.tasks.first(where: { $0.id == id }),
+              !task.subtasks.isEmpty,
+              !collapsedParentIDs.contains(id) else { return false }
+        collapsedParentIDs.insert(id)
+        return true
+    }
+
+    /// Right arrow: expand the selected parent when it has subtasks and is currently collapsed.
+    @discardableResult
+    func expandSelectedParent() -> Bool {
+        guard let id = selection, !isCompletedHeaderSelected else { return false }
+        guard case .task = locate(id) else { return false }
+        guard let task = store.days[selectedKey]?.tasks.first(where: { $0.id == id }),
+              !task.subtasks.isEmpty,
+              collapsedParentIDs.contains(id) else { return false }
+        collapsedParentIDs.remove(id)
+        return true
+    }
+
     var dateSubtitle: String {
         let f = DateFormatter()
         f.locale = Locale.current
@@ -214,6 +281,70 @@ final class PopoverViewModel: ObservableObject {
     var laterCount: Int { store.laterTasks.count }
     var hasLaterTasks: Bool { !store.laterTasks.isEmpty }
     var isLaterEditing: Bool { laterEditingTaskID != nil }
+
+    /// Flattened row order for the Later view. Parent first, then subtasks (skipped when the
+    /// parent is collapsed). Respects the active search filter so a searched parent still
+    /// shows its subtasks below it.
+    var laterRows: [ListRow] {
+        let tasks = isLaterSearchActive ? laterSearchResults : laterTasks
+        return tasks.flatMap { t in
+            var rows: [ListRow] = [.parent(t)]
+            if !collapsedParentIDs.contains(t.id) {
+                rows.append(contentsOf: t.subtasks.map { .subtask(parentID: t.id, $0) })
+            }
+            return rows
+        }
+    }
+
+    /// Selection-aware lookup in the Later bucket.
+    func laterLocate(_ id: UUID) -> Located {
+        if let i = store.laterTasks.firstIndex(where: { $0.id == id }) {
+            return .task(index: i)
+        }
+        for (pi, p) in store.laterTasks.enumerated() {
+            if let si = p.subtasks.firstIndex(where: { $0.id == id }) {
+                return .subtask(parentIndex: pi, subtaskIndex: si)
+            }
+        }
+        return .notFound
+    }
+
+    func isLaterParentCollapsed(_ id: UUID) -> Bool { collapsedParentIDs.contains(id) }
+
+    func toggleLaterParentCollapse(_ parentID: UUID) {
+        guard let task = store.laterTasks.first(where: { $0.id == parentID }),
+              !task.subtasks.isEmpty else { return }
+        if collapsedParentIDs.contains(parentID) {
+            collapsedParentIDs.remove(parentID)
+        } else {
+            if let sel = laterSelection, task.subtasks.contains(where: { $0.id == sel }) {
+                laterSelection = parentID
+            }
+            collapsedParentIDs.insert(parentID)
+        }
+    }
+
+    @discardableResult
+    func collapseSelectedLaterParent() -> Bool {
+        guard let id = laterSelection else { return false }
+        guard case .task = laterLocate(id) else { return false }
+        guard let task = store.laterTasks.first(where: { $0.id == id }),
+              !task.subtasks.isEmpty,
+              !collapsedParentIDs.contains(id) else { return false }
+        collapsedParentIDs.insert(id)
+        return true
+    }
+
+    @discardableResult
+    func expandSelectedLaterParent() -> Bool {
+        guard let id = laterSelection else { return false }
+        guard case .task = laterLocate(id) else { return false }
+        guard let task = store.laterTasks.first(where: { $0.id == id }),
+              !task.subtasks.isEmpty,
+              collapsedParentIDs.contains(id) else { return false }
+        collapsedParentIDs.remove(id)
+        return true
+    }
 
     var laterSearchResults: [TaskItem] {
         let q = laterSearchQuery.lowercased().trimmingCharacters(in: .whitespaces)
@@ -247,17 +378,18 @@ final class PopoverViewModel: ObservableObject {
         let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // `:sub <text>` power-user syntax: attach as a subtask if a parent anchor exists.
-        // If no anchor, fall back to a plain top-level task with the prefix kept intact.
-        if let subText = parseSubSyntax(trimmed),
-           let anchorID = subtaskAnchorParentID() {
+        // `<subtask> :sub <parent>` power-user syntax: split on the separator and match the
+        // parent by text against today's top-level tasks. If no parent matches, fall through
+        // to a normal top-level task with the literal input.
+        if let (subText, parentQuery) = parseSubSyntax(trimmed),
+           let parent = findParentMatch(parentQuery, in: store.tasks(for: store.todayKey)) {
             let key = store.todayKey
             let snapshot = store.days[key, default: DayBucket()]
-            if store.addSubtask(dayKey: key, parentID: anchorID, text: subText) != nil {
+            if store.addSubtask(dayKey: key, parentID: parent.id, text: subText) != nil {
                 registerUndo(UndoAction(
                     dayKey: key,
                     snapshot: snapshot,
-                    label: "Added subtask",
+                    label: "Added '\(subText)' under '\(parent.text)'",
                     selectionToRestore: selection
                 ))
                 Analytics.send("subtask.added", with: ["method": "syntax"])
@@ -275,44 +407,75 @@ final class PopoverViewModel: ObservableObject {
         Analytics.send("task.added")
     }
 
-    /// Returns the content after `:sub ` (case-insensitive) when the input matches, else nil.
-    /// Requires a whitespace separator after the prefix so e.g. `:subject` is not misparsed.
-    private func parseSubSyntax(_ trimmed: String) -> String? {
-        let prefix = ":sub"
-        guard trimmed.lowercased().hasPrefix(prefix) else { return nil }
-        let after = trimmed.dropFirst(prefix.count)
-        guard let first = after.first, first == " " || first == "\t" else { return nil }
-        let content = after.drop(while: { $0.isWhitespace })
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return content.isEmpty ? nil : content
+    /// Splits `<subtask> :sub <parent>` (case-insensitive separator, whitespace-delimited)
+    /// into its two halves. Returns nil when the input doesn't contain the separator or when
+    /// either side is empty.
+    private func parseSubSyntax(_ trimmed: String) -> (subtask: String, parentQuery: String)? {
+        guard let range = trimmed.range(of: " :sub ", options: .caseInsensitive) else { return nil }
+        let sub = trimmed[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        let parent = trimmed[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sub.isEmpty, !parent.isEmpty else { return nil }
+        return (String(sub), String(parent))
     }
 
-    /// Anchor selection for `:sub` syntax. Priority:
-    /// 1. Currently selected task (or parent of a selected subtask).
-    /// 2. Most recently added top-level task in the current session.
-    /// 3. Last undone top-level task in today's bucket, so the syntax works out of the box
-    ///    on a freshly opened app with only rolled-over tasks.
-    /// 4. Last top-level task of any state, as a final fallback.
-    private func subtaskAnchorParentID() -> UUID? {
-        let key = store.todayKey
-        if let sel = selection {
-            switch locate(sel, in: key) {
-            case .task(let i):
-                return store.days[key]?.tasks[i].id
-            case .subtask(let pi, _):
-                return store.days[key]?.tasks[pi].id
-            case .notFound:
-                break
+    /// The id of the top-level task currently matched by `:sub` syntax — used by the list to
+    /// highlight the prospective parent as the user types.
+    var subSyntaxHintedParentID: UUID? { subSyntaxHint?.parentMatch?.id }
+
+    /// Live hint derived from `newText`. Non-nil whenever the input contains ` :sub` (with a
+    /// leading space), which signals the user is mid-composition. Consumed by the UI to render
+    /// the autocomplete row below the input.
+    var subSyntaxHint: SubSyntaxHint? {
+        let raw = newText
+        guard let subRange = raw.range(of: " :sub", options: .caseInsensitive) else { return nil }
+        let afterSub = raw[subRange.upperBound...]
+        let query: String
+        if afterSub.isEmpty {
+            query = ""
+        } else if let first = afterSub.first, first == " " || first == "\t" {
+            query = afterSub.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            // `:subdued` or similar — not subtask syntax.
+            return nil
+        }
+        let match = query.isEmpty ? nil : findParentMatch(query, in: store.tasks(for: store.todayKey))
+        return SubSyntaxHint(parentMatch: match, rawQuery: query)
+    }
+
+    /// Tab-to-complete handler. Replaces the partial parent query in `newText` with the full
+    /// matched parent text. Returns true when a completion was applied so the bridge can consume
+    /// the Tab event; false falls back to the default "move focus to list" behavior.
+    @discardableResult
+    func completeSubSyntax() -> Bool {
+        guard let hint = subSyntaxHint, let parent = hint.parentMatch else { return false }
+        guard let range = newText.range(of: " :sub ", options: .caseInsensitive) else { return false }
+        let prefix = String(newText[..<range.upperBound])
+        newText = prefix + parent.text
+        return true
+    }
+
+    /// Finds the best top-level task matching `query` in the given bucket. Exact match beats
+    /// prefix match beats substring match; within the same tier, first in bucket order wins.
+    /// Case-insensitive.
+    private func findParentMatch(_ query: String, in tasks: [TaskItem]) -> TaskItem? {
+        let q = query.lowercased()
+        enum Quality: Int { case substring = 1, prefix = 2, exact = 3 }
+        var best: (task: TaskItem, quality: Quality)?
+        for task in tasks {
+            let t = task.text.lowercased()
+            let quality: Quality?
+            if t == q { quality = .exact }
+            else if t.hasPrefix(q) { quality = .prefix }
+            else if t.contains(q) { quality = .substring }
+            else { quality = nil }
+            if let qty = quality {
+                if best == nil || qty.rawValue > best!.quality.rawValue {
+                    best = (task, qty)
+                }
+                if qty == .exact { break }
             }
         }
-        if let last = lastAddedTopLevelID,
-           store.days[key]?.tasks.contains(where: { $0.id == last }) == true {
-            return last
-        }
-        if let lastUndone = store.days[key]?.tasks.last(where: { !$0.isDone }) {
-            return lastUndone.id
-        }
-        return store.days[key]?.tasks.last?.id
+        return best?.task
     }
 
     func addTasksFromPaste(_ entries: [PastedEntry]) {
@@ -929,7 +1092,7 @@ final class PopoverViewModel: ObservableObject {
         let prevLaterSelection = laterSelection
 
         moveLaterToToday(taskID: taskID)
-        store.toggleDone(dayKey: todayKey, taskID: taskID)
+        store.toggleTaskDoneCascading(dayKey: todayKey, taskID: taskID)
         Analytics.send("task.completedFromLater")
 
         registerUndo(UndoAction(
@@ -957,48 +1120,132 @@ final class PopoverViewModel: ObservableObject {
 
     func deleteLaterSelected() {
         guard let id = laterSelection else { return }
-        guard let task = store.laterTasks.first(where: { $0.id == id }) else { return }
         let laterSnapshot = store.laterTasks
-        let tasks = laterTasks
-        let idx = tasks.firstIndex(where: { $0.id == id })
-        store.deleteLaterTask(taskID: id)
 
-        let remaining = laterTasks
-        if let idx, !remaining.isEmpty {
-            laterSelection = remaining[min(idx, remaining.count - 1)].id
-        } else {
-            laterSelection = remaining.first?.id
+        switch laterLocate(id) {
+        case .subtask(let pi, let si):
+            let parent = store.laterTasks[pi]
+            let siblings = parent.subtasks
+            store.deleteLaterSubtask(parentID: parent.id, subtaskID: id)
+            Analytics.send("subtask.deleted")
+
+            // Prefer next sibling, then previous, else the parent.
+            let nextID: UUID? = {
+                if si + 1 < siblings.count { return siblings[si + 1].id }
+                if si - 1 >= 0 { return siblings[si - 1].id }
+                return parent.id
+            }()
+            laterSelection = nextID
+
+            registerUndo(UndoAction(
+                laterSnapshot: laterSnapshot,
+                label: "Deleted subtask",
+                laterSelectionToRestore: id
+            ))
+
+        case .task:
+            guard let task = store.laterTasks.first(where: { $0.id == id }) else { return }
+            let idx = laterTasks.firstIndex(where: { $0.id == id })
+            store.deleteLaterTask(taskID: id)
+
+            let remaining = laterTasks
+            if let idx, !remaining.isEmpty {
+                laterSelection = remaining[min(idx, remaining.count - 1)].id
+            } else {
+                laterSelection = remaining.first?.id
+            }
+
+            registerUndo(UndoAction(
+                laterSnapshot: laterSnapshot,
+                label: "Deleted '\(task.text)'",
+                laterSelectionToRestore: id
+            ))
+
+        case .notFound:
+            return
         }
-
-        registerUndo(UndoAction(
-            laterSnapshot: laterSnapshot,
-            label: "Deleted '\(task.text)'",
-            laterSelectionToRestore: id
-        ))
     }
 
     func deleteLaterTask(taskID: UUID) {
-        guard let task = store.laterTasks.first(where: { $0.id == taskID }) else { return }
         let laterSnapshot = store.laterTasks
-        store.deleteLaterTask(taskID: taskID)
-        registerUndo(UndoAction(
-            laterSnapshot: laterSnapshot,
-            label: "Deleted '\(task.text)'",
-            laterSelectionToRestore: taskID
-        ))
+        switch laterLocate(taskID) {
+        case .subtask(let pi, _):
+            let parentID = store.laterTasks[pi].id
+            store.deleteLaterSubtask(parentID: parentID, subtaskID: taskID)
+            Analytics.send("subtask.deleted")
+            registerUndo(UndoAction(
+                laterSnapshot: laterSnapshot,
+                label: "Deleted subtask",
+                laterSelectionToRestore: laterSelection
+            ))
+
+        case .task:
+            guard let task = store.laterTasks.first(where: { $0.id == taskID }) else { return }
+            store.deleteLaterTask(taskID: taskID)
+            registerUndo(UndoAction(
+                laterSnapshot: laterSnapshot,
+                label: "Deleted '\(task.text)'",
+                laterSelectionToRestore: taskID
+            ))
+
+        case .notFound:
+            break
+        }
     }
 
     func startLaterEditing(taskID: UUID) {
-        guard let task = laterTasks.first(where: { $0.id == taskID }) else { return }
-        laterEditingTaskID = taskID
-        laterEditText = task.text
+        switch laterLocate(taskID) {
+        case .task(let i):
+            laterEditingTaskID = taskID
+            laterEditText = store.laterTasks[i].text
+        case .subtask(let pi, let si):
+            laterEditingTaskID = taskID
+            laterEditText = store.laterTasks[pi].subtasks[si].text
+        case .notFound:
+            return
+        }
+    }
+
+    /// Directly toggles a Later subtask's done state. Used by the subtask row's checkbox tap so
+    /// the action doesn't depend on `laterSelection` already pointing at the subtask.
+    func toggleLaterSubtaskDone(subtaskID: UUID) {
+        guard case .subtask(let pi, let si) = laterLocate(subtaskID) else { return }
+        let parentID = store.laterTasks[pi].id
+        let wasDone = store.laterTasks[pi].subtasks[si].isDone
+        let snapshot = store.laterTasks
+        store.toggleLaterSubtaskDone(parentID: parentID, subtaskID: subtaskID)
+        registerUndo(UndoAction(
+            laterSnapshot: snapshot,
+            label: wasDone ? "Unmarked subtask" : "Completed subtask",
+            laterSelectionToRestore: subtaskID
+        ))
+        if !wasDone { Analytics.send("subtask.completed") }
     }
 
     @discardableResult
     func completeSelectedLater() -> Bool {
         guard let id = laterSelection else { return false }
-        completeLaterTask(taskID: id)
-        return true
+        switch laterLocate(id) {
+        case .task:
+            completeLaterTask(taskID: id)
+            return true
+
+        case .subtask(let pi, let si):
+            let parentID = store.laterTasks[pi].id
+            let wasDone = store.laterTasks[pi].subtasks[si].isDone
+            let snapshot = store.laterTasks
+            store.toggleLaterSubtaskDone(parentID: parentID, subtaskID: id)
+            registerUndo(UndoAction(
+                laterSnapshot: snapshot,
+                label: wasDone ? "Unmarked subtask" : "Completed subtask",
+                laterSelectionToRestore: id
+            ))
+            if !wasDone { Analytics.send("subtask.completed") }
+            return true
+
+        case .notFound:
+            return false
+        }
     }
 
     func startLaterEditingSelected() -> Bool {
@@ -1010,15 +1257,30 @@ final class PopoverViewModel: ObservableObject {
     func commitLaterEdit() {
         guard let taskID = laterEditingTaskID else { return }
 
-        if let task = store.laterTasks.first(where: { $0.id == taskID }) {
+        switch laterLocate(taskID) {
+        case .task:
+            if let task = store.laterTasks.first(where: { $0.id == taskID }) {
+                registerUndo(UndoAction(
+                    laterSnapshot: store.laterTasks,
+                    label: "Edited '\(task.text)'",
+                    laterSelectionToRestore: taskID
+                ))
+            }
+            store.updateLaterTaskText(taskID: taskID, text: laterEditText)
+
+        case .subtask(let pi, _):
+            let parentID = store.laterTasks[pi].id
             registerUndo(UndoAction(
                 laterSnapshot: store.laterTasks,
-                label: "Edited '\(task.text)'",
+                label: "Edited subtask",
                 laterSelectionToRestore: taskID
             ))
+            store.updateLaterSubtaskText(parentID: parentID, subtaskID: taskID, text: laterEditText)
+
+        case .notFound:
+            break
         }
 
-        store.updateLaterTaskText(taskID: taskID, text: laterEditText)
         laterEditingTaskID = nil
         laterEditText = ""
         laterFocusListToken += 1
@@ -1037,20 +1299,38 @@ final class PopoverViewModel: ObservableObject {
 
     func moveLaterSelectedTask(direction: Int) -> Bool {
         guard !isLaterEditing, !isLaterSearchActive,
-              let id = laterSelection,
-              let task = store.laterTasks.first(where: { $0.id == id }) else { return false }
+              let id = laterSelection else { return false }
 
-        let snapshot = store.laterTasks
-        store.moveLaterTask(taskID: id, direction: direction)
+        switch laterLocate(id) {
+        case .subtask(let pi, _):
+            let parentID = store.laterTasks[pi].id
+            let snapshot = store.laterTasks
+            store.moveLaterSubtask(parentID: parentID, subtaskID: id, direction: direction)
+            if store.laterTasks[pi].subtasks.map(\.id) != snapshot[pi].subtasks.map(\.id) {
+                registerUndo(UndoAction(
+                    laterSnapshot: snapshot,
+                    label: "Moved subtask",
+                    laterSelectionToRestore: id
+                ))
+            }
+            return true
 
-        if store.laterTasks.map(\.id) != snapshot.map(\.id) {
-            registerUndo(UndoAction(
-                laterSnapshot: snapshot,
-                label: "Moved '\(task.text)'",
-                laterSelectionToRestore: id
-            ))
+        case .task:
+            guard let task = store.laterTasks.first(where: { $0.id == id }) else { return false }
+            let snapshot = store.laterTasks
+            store.moveLaterTask(taskID: id, direction: direction)
+            if store.laterTasks.map(\.id) != snapshot.map(\.id) {
+                registerUndo(UndoAction(
+                    laterSnapshot: snapshot,
+                    label: "Moved '\(task.text)'",
+                    laterSelectionToRestore: id
+                ))
+            }
+            return true
+
+        case .notFound:
+            return false
         }
-        return true
     }
 
     func reorderLaterTasks(fromOffsets: IndexSet, toOffset: Int) {

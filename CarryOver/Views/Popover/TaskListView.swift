@@ -71,6 +71,12 @@ struct TaskListView: View {
                 onShiftTab: { viewModel.unindentSelectedSubtask() }
             )
             .frame(width: 0, height: 0)
+
+            ParentCollapseArrowBridge(
+                onLeftArrow: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.collapseSelectedParent() } },
+                onRightArrow: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.expandSelectedParent() } }
+            )
+            .frame(width: 0, height: 0)
         }
     }
 
@@ -101,7 +107,10 @@ struct TaskListView: View {
                     onCancelEdit: { viewModel.cancelEdit() },
                     onDelete: { viewModel.deleteTask(taskID: task.id) },
                     onSelect: { viewModel.selectTask(task.id) },
-                    onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil
+                    onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
+                    isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
+                    isCollapsed: viewModel.isParentCollapsed(task.id),
+                    onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
                 )
                 .tag(task.id)
                 .listRowSeparator(.hidden)
@@ -132,7 +141,10 @@ struct TaskListView: View {
                     onDelete: { viewModel.deleteTask(taskID: task.id) },
                     onSelect: { viewModel.selectTask(task.id) },
                     onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
-                    onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil
+                    onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil,
+                    isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
+                    isCollapsed: viewModel.isParentCollapsed(task.id),
+                    onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
                 )
                 .tag(task.id)
                 .opacity(viewModel.draggingTaskID == task.id ? 0.3 : 1.0)
@@ -240,7 +252,10 @@ struct TaskListView: View {
                             onDelete: { viewModel.deleteTask(taskID: task.id) },
                             onSelect: { viewModel.selectTask(task.id) },
                             onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
-                            onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil
+                            onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil,
+                            isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
+                            isCollapsed: viewModel.isParentCollapsed(task.id),
+                            onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
                         )
                         .tag(task.id)
                         .listRowSeparator(.hidden)

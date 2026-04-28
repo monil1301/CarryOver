@@ -11,10 +11,6 @@ struct LaterView: View {
 
     private let rowInsets = EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)
 
-    private var displayedTasks: [TaskItem] {
-        viewModel.isLaterSearchActive ? viewModel.laterSearchResults : viewModel.laterTasks
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.isLaterSearchActive {
@@ -30,8 +26,8 @@ struct LaterView: View {
             }
 
             List(selection: $viewModel.laterSelection) {
-                let tasks = displayedTasks
-                if tasks.isEmpty {
+                let rows = viewModel.laterRows
+                if rows.isEmpty {
                     Text(viewModel.isLaterSearchActive && !viewModel.laterSearchQuery.isEmpty
                          ? "No matching tasks"
                          : "No tasks in Later.")
@@ -40,46 +36,69 @@ struct LaterView: View {
                         .listRowInsets(rowInsets)
                         .listRowBackground(Color.clear)
                 } else {
-                    ForEach(tasks) { task in
-                        LaterTaskRowView(
-                            task: task,
-                            isEditing: viewModel.laterEditingTaskID == task.id,
-                            isSelected: viewModel.laterSelection == task.id,
-                            editText: $viewModel.laterEditText,
-                            onComplete: { viewModel.completeLaterTask(taskID: task.id) },
-                            onMoveToToday: { viewModel.moveSelectedLaterToToday(taskID: task.id) },
-                            onEdit: { viewModel.startLaterEditing(taskID: task.id) },
-                            onCommitEdit: { viewModel.commitLaterEdit() },
-                            onCancelEdit: { viewModel.cancelLaterEdit() },
-                            onDelete: { viewModel.deleteLaterTask(taskID: task.id) },
-                            onSelect: { viewModel.laterSelection = task.id }
-                        )
-                        .tag(task.id)
-                        .opacity(viewModel.laterDraggingTaskID == task.id ? 0.3 : 1.0)
-                        .onDrag {
-                            viewModel.beginLaterDrag(taskID: task.id)
-                            return NSItemProvider(object: task.id.uuidString as NSString)
-                        } preview: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "circle")
-                                    .foregroundStyle(.secondary)
-                                Text(task.text)
-                                Spacer()
+                    ForEach(rows) { row in
+                        switch row {
+                        case .parent(let task):
+                            LaterTaskRowView(
+                                task: task,
+                                isEditing: viewModel.laterEditingTaskID == task.id,
+                                isSelected: viewModel.laterSelection == task.id,
+                                editText: $viewModel.laterEditText,
+                                onComplete: { viewModel.completeLaterTask(taskID: task.id) },
+                                onMoveToToday: { viewModel.moveSelectedLaterToToday(taskID: task.id) },
+                                onEdit: { viewModel.startLaterEditing(taskID: task.id) },
+                                onCommitEdit: { viewModel.commitLaterEdit() },
+                                onCancelEdit: { viewModel.cancelLaterEdit() },
+                                onDelete: { viewModel.deleteLaterTask(taskID: task.id) },
+                                onSelect: { viewModel.laterSelection = task.id },
+                                isCollapsed: viewModel.isLaterParentCollapsed(task.id),
+                                onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleLaterParentCollapse(task.id) } }
+                            )
+                            .tag(task.id)
+                            .opacity(viewModel.laterDraggingTaskID == task.id ? 0.3 : 1.0)
+                            .onDrag {
+                                viewModel.beginLaterDrag(taskID: task.id)
+                                return NSItemProvider(object: task.id.uuidString as NSString)
+                            } preview: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "circle")
+                                        .foregroundStyle(.secondary)
+                                    Text(task.text)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(width: 280, alignment: .leading)
+                                .background(.background)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .frame(width: 280, alignment: .leading)
-                            .background(.background)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                            .onDrop(of: [.text], delegate: LaterReorderDropDelegate(
+                                targetTaskID: task.id,
+                                viewModel: viewModel
+                            ))
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(rowInsets)
+                            .listRowBackground(Color.clear)
+
+                        case .subtask(_, let subtask):
+                            SubtaskRowView(
+                                subtask: subtask,
+                                isEditing: viewModel.laterEditingTaskID == subtask.id,
+                                isSelected: viewModel.laterSelection == subtask.id,
+                                editText: $viewModel.laterEditText,
+                                onToggle: { viewModel.toggleLaterSubtaskDone(subtaskID: subtask.id) },
+                                onEdit: { viewModel.startLaterEditing(taskID: subtask.id) },
+                                onCommitEdit: { viewModel.commitLaterEdit() },
+                                onCancelEdit: { viewModel.cancelLaterEdit() },
+                                onDelete: { viewModel.deleteLaterTask(taskID: subtask.id) },
+                                onSelect: { viewModel.laterSelection = subtask.id }
+                            )
+                            .tag(subtask.id)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(rowInsets)
+                            .listRowBackground(Color.clear)
                         }
-                        .onDrop(of: [.text], delegate: LaterReorderDropDelegate(
-                            targetTaskID: task.id,
-                            viewModel: viewModel
-                        ))
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(rowInsets)
-                        .listRowBackground(Color.clear)
                     }
                 }
             }
@@ -132,6 +151,12 @@ struct LaterView: View {
             ListReorderKeyBridge(
                 onMoveUp: { viewModel.moveLaterSelectedTask(direction: -1) },
                 onMoveDown: { viewModel.moveLaterSelectedTask(direction: 1) }
+            )
+            .frame(width: 0, height: 0)
+
+            ParentCollapseArrowBridge(
+                onLeftArrow: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.collapseSelectedLaterParent() } },
+                onRightArrow: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.expandSelectedLaterParent() } }
             )
             .frame(width: 0, height: 0)
 

@@ -17,6 +17,8 @@ struct LaterTaskRowView: View {
     let onCancelEdit: () -> Void
     let onDelete: () -> Void
     let onSelect: () -> Void
+    var isCollapsed: Bool = false
+    var onToggleCollapse: (() -> Void)? = nil
 
     @FocusState private var fieldFocused: Bool
     @State private var isHovered = false
@@ -43,6 +45,14 @@ struct LaterTaskRowView: View {
                 Text(task.text)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.primary)
+            }
+
+            if !task.subtasks.isEmpty {
+                SubtaskProgressPill(
+                    subtasks: task.subtasks,
+                    isCollapsed: isCollapsed,
+                    onToggle: { onToggleCollapse?() }
+                )
             }
 
             Spacer()
