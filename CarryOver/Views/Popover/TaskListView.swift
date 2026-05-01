@@ -44,7 +44,7 @@ struct TaskListView: View {
                 withAnimation { viewModel.toggleCompletedCollapse() }
                 return true
             }
-            return viewModel.toggleSelectedDone()
+            return withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleSelectedDone() }
         })
         .frame(width: 0, height: 0)
 
@@ -101,7 +101,7 @@ struct TaskListView: View {
                     isCarried: viewModel.isCarried(task),
                     isReorderable: false,
                     editText: $viewModel.editText,
-                    onToggle: { viewModel.toggleDone(taskID: task.id) },
+                    onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: task.id) } },
                     onEdit: { viewModel.startEditing(taskID: task.id) },
                     onCommitEdit: { viewModel.commitEdit() },
                     onCancelEdit: { viewModel.cancelEdit() },
@@ -124,6 +124,24 @@ struct TaskListView: View {
 
     @ViewBuilder
     private var normalTaskList: some View {
+        if viewModel.isToday {
+            todayTaskList
+        } else {
+            pastDayTaskList
+        }
+
+        if viewModel.tasks.isEmpty && !viewModel.showLaterNudge {
+            Text("No tasks for this day.")
+                .foregroundStyle(.secondary)
+                .listRowSeparator(.hidden)
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
+        }
+    }
+
+    // Today: undone (with drag), Later nudge, Completed section (collapsible).
+    @ViewBuilder
+    private var todayTaskList: some View {
         ForEach(viewModel.undoneRows) { row in
             switch row {
             case .parent(let task):
@@ -134,14 +152,14 @@ struct TaskListView: View {
                     isToday: viewModel.isToday,
                     isCarried: viewModel.isCarried(task),
                     editText: $viewModel.editText,
-                    onToggle: { viewModel.toggleDone(taskID: task.id) },
+                    onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: task.id) } },
                     onEdit: { viewModel.startEditing(taskID: task.id) },
                     onCommitEdit: { viewModel.commitEdit() },
                     onCancelEdit: { viewModel.cancelEdit() },
                     onDelete: { viewModel.deleteTask(taskID: task.id) },
                     onSelect: { viewModel.selectTask(task.id) },
-                    onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
-                    onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil,
+                    onMoveToLater: { viewModel.moveTaskToLater(taskID: task.id) },
+                    onAddSubtask: { viewModel.addSubtaskFromContextMenu(parentID: task.id) },
                     isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
                     isCollapsed: viewModel.isParentCollapsed(task.id),
                     onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
@@ -179,7 +197,7 @@ struct TaskListView: View {
                     isEditing: viewModel.editingTaskID == subtask.id,
                     isSelected: viewModel.selection == subtask.id,
                     editText: $viewModel.editText,
-                    onToggle: { viewModel.toggleDone(taskID: subtask.id) },
+                    onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: subtask.id) } },
                     onEdit: { viewModel.startEditing(taskID: subtask.id) },
                     onCommitEdit: { viewModel.commitEdit() },
                     onCancelEdit: { viewModel.cancelEdit() },
@@ -210,31 +228,29 @@ struct TaskListView: View {
         }
 
         if !viewModel.doneTasks.isEmpty {
-            if viewModel.isToday {
-                Divider()
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 8, leading: -16, bottom: 8, trailing: -16))
-
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(viewModel.isCompletedCollapsed ? 0 : 90))
-                        .font(.caption2)
-                    Text("Completed (\(viewModel.doneTasks.count))")
-                }
-                .foregroundStyle(.secondary)
-                .font(.subheadline.weight(.medium))
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    viewModel.selection = PopoverViewModel.completedHeaderID
-                    withAnimation { viewModel.toggleCompletedCollapse() }
-                }
-                .tag(PopoverViewModel.completedHeaderID)
+            Divider()
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                .listRowBackground(Color.clear)
-            }
+                .listRowInsets(EdgeInsets(top: 8, leading: -16, bottom: 8, trailing: -16))
 
-            if !viewModel.isToday || !viewModel.isCompletedCollapsed {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(viewModel.isCompletedCollapsed ? 0 : 90))
+                    .font(.caption2)
+                Text("Completed (\(viewModel.doneTasks.count))")
+            }
+            .foregroundStyle(.secondary)
+            .font(.subheadline.weight(.medium))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                viewModel.selection = PopoverViewModel.completedHeaderID
+                withAnimation { viewModel.toggleCompletedCollapse() }
+            }
+            .tag(PopoverViewModel.completedHeaderID)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
+
+            if !viewModel.isCompletedCollapsed {
                 ForEach(viewModel.doneRows) { row in
                     switch row {
                     case .parent(let task):
@@ -245,14 +261,14 @@ struct TaskListView: View {
                             isToday: viewModel.isToday,
                             isCarried: viewModel.isCarried(task),
                             editText: $viewModel.editText,
-                            onToggle: { viewModel.toggleDone(taskID: task.id) },
+                            onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: task.id) } },
                             onEdit: { viewModel.startEditing(taskID: task.id) },
                             onCommitEdit: { viewModel.commitEdit() },
                             onCancelEdit: { viewModel.cancelEdit() },
                             onDelete: { viewModel.deleteTask(taskID: task.id) },
                             onSelect: { viewModel.selectTask(task.id) },
-                            onMoveToLater: viewModel.isToday ? { viewModel.moveTaskToLater(taskID: task.id) } : nil,
-                            onAddSubtask: viewModel.isToday ? { viewModel.addSubtaskFromContextMenu(parentID: task.id) } : nil,
+                            onMoveToLater: { viewModel.moveTaskToLater(taskID: task.id) },
+                            onAddSubtask: { viewModel.addSubtaskFromContextMenu(parentID: task.id) },
                             isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
                             isCollapsed: viewModel.isParentCollapsed(task.id),
                             onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
@@ -268,7 +284,7 @@ struct TaskListView: View {
                             isEditing: viewModel.editingTaskID == subtask.id,
                             isSelected: viewModel.selection == subtask.id,
                             editText: $viewModel.editText,
-                            onToggle: { viewModel.toggleDone(taskID: subtask.id) },
+                            onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: subtask.id) } },
                             onEdit: { viewModel.startEditing(taskID: subtask.id) },
                             onCommitEdit: { viewModel.commitEdit() },
                             onCancelEdit: { viewModel.cancelEdit() },
@@ -283,13 +299,58 @@ struct TaskListView: View {
                 }
             }
         }
+    }
 
-        if viewModel.tasks.isEmpty && !viewModel.showLaterNudge {
-            Text("No tasks for this day.")
-                .foregroundStyle(.secondary)
+    // Past day: single ForEach over `tasks` in raw array order — no undone/done segregation,
+    // so toggling done state doesn't shuffle rows. No drag-to-reorder (past days are read-only
+    // for ordering).
+    @ViewBuilder
+    private var pastDayTaskList: some View {
+        ForEach(viewModel.allRows) { row in
+            switch row {
+            case .parent(let task):
+                TaskRowView(
+                    task: task,
+                    isEditing: viewModel.editingTaskID == task.id,
+                    isSelected: viewModel.selection == task.id,
+                    isToday: false,
+                    isCarried: viewModel.isCarried(task),
+                    editText: $viewModel.editText,
+                    onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: task.id) } },
+                    onEdit: { viewModel.startEditing(taskID: task.id) },
+                    onCommitEdit: { viewModel.commitEdit() },
+                    onCancelEdit: { viewModel.cancelEdit() },
+                    onDelete: { viewModel.deleteTask(taskID: task.id) },
+                    onSelect: { viewModel.selectTask(task.id) },
+                    onMoveToLater: nil,
+                    onAddSubtask: nil,
+                    isSubSyntaxHintMatch: viewModel.subSyntaxHintedParentID == task.id,
+                    isCollapsed: viewModel.isParentCollapsed(task.id),
+                    onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleParentCollapse(task.id) } }
+                )
+                .tag(task.id)
                 .listRowSeparator(.hidden)
                 .listRowInsets(rowInsets)
                 .listRowBackground(Color.clear)
+
+            case .subtask(_, let subtask):
+                SubtaskRowView(
+                    subtask: subtask,
+                    isEditing: viewModel.editingTaskID == subtask.id,
+                    isSelected: viewModel.selection == subtask.id,
+                    editText: $viewModel.editText,
+                    onToggle: { withAnimation(.easeInOut(duration: 0.15)) { viewModel.toggleDone(taskID: subtask.id) } },
+                    onEdit: { viewModel.startEditing(taskID: subtask.id) },
+                    onCommitEdit: { viewModel.commitEdit() },
+                    onCancelEdit: { viewModel.cancelEdit() },
+                    onDelete: { viewModel.deleteTask(taskID: subtask.id) },
+                    onSelect: { viewModel.selectTask(subtask.id) }
+                )
+                .tag(subtask.id)
+                .listRowSeparator(.hidden)
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
+            }
         }
     }
 }

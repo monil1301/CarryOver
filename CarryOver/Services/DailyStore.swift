@@ -365,7 +365,7 @@ final class DailyStore: ObservableObject {
     /// Toggles a top-level task's done state, cascading the new state to all of its subtasks
     /// when marking done (stamping completedAt on any that weren't already done).
     /// Un-marking a parent leaves subtask states alone.
-    func toggleTaskDoneCascading(dayKey: String, taskID: UUID) {
+    func toggleTaskDoneCascading(dayKey: String, taskID: UUID, reorder: Bool = true) {
         guard var bucket = days[dayKey],
               let i = bucket.tasks.firstIndex(where: { $0.id == taskID }) else { return }
 
@@ -383,7 +383,9 @@ final class DailyStore: ObservableObject {
         }
 
         days[dayKey] = bucket
-        normalizeOrder(dayKey: dayKey)
+        if reorder {
+            normalizeOrder(dayKey: dayKey)
+        }
         save()
     }
 
@@ -433,13 +435,15 @@ final class DailyStore: ObservableObject {
     /// subtask array. Returns true if the parent's subtasks are now all-done (caller can use
     /// this to drive parent auto-completion if the user has the setting enabled).
     @discardableResult
-    func toggleSubtaskDone(dayKey: String, parentID: UUID, subtaskID: UUID) -> Bool {
+    func toggleSubtaskDone(dayKey: String, parentID: UUID, subtaskID: UUID, reorder: Bool = true) -> Bool {
         guard var bucket = days[dayKey],
               let p = bucket.tasks.firstIndex(where: { $0.id == parentID }),
               let s = bucket.tasks[p].subtasks.firstIndex(where: { $0.id == subtaskID }) else { return false }
         bucket.tasks[p].subtasks[s].isDone.toggle()
         bucket.tasks[p].subtasks[s].completedAt = bucket.tasks[p].subtasks[s].isDone ? Date() : nil
-        normalizeSubtasksOrder(&bucket.tasks[p].subtasks)
+        if reorder {
+            normalizeSubtasksOrder(&bucket.tasks[p].subtasks)
+        }
         let allDone = !bucket.tasks[p].subtasks.isEmpty && bucket.tasks[p].subtasks.allSatisfy { $0.isDone }
         days[dayKey] = bucket
         save()

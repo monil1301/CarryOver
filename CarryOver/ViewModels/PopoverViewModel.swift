@@ -176,6 +176,18 @@ final class PopoverViewModel: ObservableObject {
         }
     }
 
+    /// Flattened row order in raw `tasks` array order — used by past-day rendering so a
+    /// done-state flip doesn't shuffle rows across an undone/done boundary.
+    var allRows: [ListRow] {
+        tasks.flatMap { t in
+            var rows: [ListRow] = [.parent(t)]
+            if !collapsedParentIDs.contains(t.id) {
+                rows.append(contentsOf: t.subtasks.map { .subtask(parentID: t.id, $0) })
+            }
+            return rows
+        }
+    }
+
     /// Locate a UUID within the current day's bucket. A single UUID can be either a top-level
     /// task or a subtask; selection uses the same id space, so callers branch on the result.
     enum Located: Equatable {
@@ -575,7 +587,7 @@ final class PopoverViewModel: ObservableObject {
             let label = task.isDone ? "Unmarked '\(task.text)'" : "Completed '\(task.text)'"
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
             if !task.isDone { Analytics.send("task.completed") }
-            store.toggleTaskDoneCascading(dayKey: key, taskID: taskID)
+            store.toggleTaskDoneCascading(dayKey: key, taskID: taskID, reorder: isToday)
             pinTaskInSearch(taskID)
 
         case .subtask(let pi, let si):
@@ -584,15 +596,26 @@ final class PopoverViewModel: ObservableObject {
             let label = sub.isDone ? "Unmarked subtask" : "Completed subtask"
             registerUndo(UndoAction(dayKey: key, snapshot: bucket, label: label, selectionToRestore: selection))
             let wasDone = sub.isDone
-            let allDone = store.toggleSubtaskDone(dayKey: key, parentID: parent.id, subtaskID: taskID)
+            let allDone = store.toggleSubtaskDone(dayKey: key, parentID: parent.id, subtaskID: taskID, reorder: isToday)
             if !wasDone { Analytics.send("subtask.completed") }
             // Auto-complete parent if the setting is on and the subtask flip made all-done true.
             if !wasDone, allDone,
                SubtaskPreferences.currentAutoCompleteParent(),
                let refreshed = store.days[key]?.tasks.first(where: { $0.id == parent.id }),
                !refreshed.isDone {
-                store.toggleTaskDoneCascading(dayKey: key, taskID: parent.id)
+                store.toggleTaskDoneCascading(dayKey: key, taskID: parent.id, reorder: isToday)
                 Analytics.send("parent.autoCompleted")
+            }
+            // Auto-uncomplete parent if the setting is on and a subtask was just unmarked
+            // under a parent that is currently done — keeps parent state mirrored to subtasks.
+            // Skip the row reorder on past days so the parent doesn't visually jump from the
+            // done group to the undone group.
+            if wasDone,
+               SubtaskPreferences.currentAutoCompleteParent(),
+               let refreshed = store.days[key]?.tasks.first(where: { $0.id == parent.id }),
+               refreshed.isDone {
+                store.toggleTaskDoneCascading(dayKey: key, taskID: parent.id, reorder: isToday)
+                Analytics.send("parent.autoUncompleted")
             }
 
         case .notFound:
