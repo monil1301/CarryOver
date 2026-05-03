@@ -37,7 +37,7 @@ struct TaskInputView: View {
     }
 }
 
-/// Autocomplete hint row shown under the input while the user is composing `<text> :sub <parent>`.
+/// Autocomplete hint row shown under the input while the user is composing `<text> :in <parent>`.
 /// Mirrors the lightweight footer vibe — muted colors, small font, no borders.
 private struct SubSyntaxHintView: View {
     let hint: SubSyntaxHint

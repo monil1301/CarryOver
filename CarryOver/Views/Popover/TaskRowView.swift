@@ -24,7 +24,7 @@ struct TaskRowView: View {
     var onMoveToLater: (() -> Void)? = nil
     var onAddSubtask: (() -> Void)? = nil
     /// When true, the row renders with a subtle accent tint to signal that it is the live
-    /// match for the currently composed `:sub <parent>` query in the input.
+    /// match for the currently composed `:in <parent>` query in the input.
     var isSubSyntaxHintMatch: Bool = false
     /// Whether this parent's subtasks are currently hidden. Drives the chevron direction on
     /// the progress pill.

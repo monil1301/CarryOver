@@ -2,7 +2,7 @@
 
 ## [v1.8.0]
 
-- Added subtasks: Tab/Shift+Tab to indent and unindent, or `:sub <parent>` in the input with Tab autocomplete
+- Added subtasks: Tab/Shift+Tab to indent and unindent, or `:in <parent>` in the input with Tab autocomplete
 - Collapse and expand a parent's subtasks with ← / →
 - Subtasks supported in Later
 - Optional setting to auto-complete a parent when all its subtasks are done

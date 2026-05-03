@@ -31,7 +31,7 @@ struct ShortcutsCheatSheetView: View {
                     ("Edit task", ["⏎", "Return"]),
                     ("Delete task", ["⌫", "Delete"]),
                     ("Toggle complete", ["Space"]),
-                    ("Create subtask", ["<text>", ":sub", "<parent>"]),
+                    ("Create subtask", ["<text>", ":in", "<parent>"]),
                     ("Indent into subtask", ["Tab"]),
                     ("Unindent subtask", ["⇧", "Tab"]),
                     ("Collapse subtasks", ["←"]),

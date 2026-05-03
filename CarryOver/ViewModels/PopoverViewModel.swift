@@ -29,7 +29,7 @@ enum PastedEntry: Equatable {
     case sub(String)
 }
 
-/// Autocomplete hint surfaced under the input while the user is composing `<text> :sub <parent>`.
+/// Autocomplete hint surfaced under the input while the user is composing `<text> :in <parent>`.
 /// `parentMatch` is nil when the query doesn't match any top-level task yet.
 struct SubSyntaxHint: Equatable {
     let parentMatch: TaskItem?
@@ -219,7 +219,7 @@ final class PopoverViewModel: ObservableObject {
         return nil
     }
 
-    /// Tracks the most recently added top-level task id so `:sub <text>` has a fallback anchor
+    /// Tracks the most recently added top-level task id so `:in <text>` has a fallback anchor
     /// when nothing is selected.
     private var lastAddedTopLevelID: UUID?
 
@@ -390,7 +390,7 @@ final class PopoverViewModel: ObservableObject {
         let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // `<subtask> :sub <parent>` power-user syntax: split on the separator and match the
+        // `<subtask> :in <parent>` power-user syntax: split on the separator and match the
         // parent by text against today's top-level tasks. If no parent matches, fall through
         // to a normal top-level task with the literal input.
         if let (subText, parentQuery) = parseSubSyntax(trimmed),
@@ -419,27 +419,27 @@ final class PopoverViewModel: ObservableObject {
         Analytics.send("task.added")
     }
 
-    /// Splits `<subtask> :sub <parent>` (case-insensitive separator, whitespace-delimited)
+    /// Splits `<subtask> :in <parent>` (case-insensitive separator, whitespace-delimited)
     /// into its two halves. Returns nil when the input doesn't contain the separator or when
     /// either side is empty.
     private func parseSubSyntax(_ trimmed: String) -> (subtask: String, parentQuery: String)? {
-        guard let range = trimmed.range(of: " :sub ", options: .caseInsensitive) else { return nil }
+        guard let range = trimmed.range(of: " :in ", options: .caseInsensitive) else { return nil }
         let sub = trimmed[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
         let parent = trimmed[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sub.isEmpty, !parent.isEmpty else { return nil }
         return (String(sub), String(parent))
     }
 
-    /// The id of the top-level task currently matched by `:sub` syntax — used by the list to
+    /// The id of the top-level task currently matched by `:in` syntax — used by the list to
     /// highlight the prospective parent as the user types.
     var subSyntaxHintedParentID: UUID? { subSyntaxHint?.parentMatch?.id }
 
-    /// Live hint derived from `newText`. Non-nil whenever the input contains ` :sub` (with a
+    /// Live hint derived from `newText`. Non-nil whenever the input contains ` :in` (with a
     /// leading space), which signals the user is mid-composition. Consumed by the UI to render
     /// the autocomplete row below the input.
     var subSyntaxHint: SubSyntaxHint? {
         let raw = newText
-        guard let subRange = raw.range(of: " :sub", options: .caseInsensitive) else { return nil }
+        guard let subRange = raw.range(of: " :in", options: .caseInsensitive) else { return nil }
         let afterSub = raw[subRange.upperBound...]
         let query: String
         if afterSub.isEmpty {
@@ -447,7 +447,7 @@ final class PopoverViewModel: ObservableObject {
         } else if let first = afterSub.first, first == " " || first == "\t" {
             query = afterSub.trimmingCharacters(in: .whitespacesAndNewlines)
         } else {
-            // `:subdued` or similar — not subtask syntax.
+            // `:include`, `:info`, or similar — not subtask syntax.
             return nil
         }
         let match = query.isEmpty ? nil : findParentMatch(query, in: store.tasks(for: store.todayKey))
@@ -460,7 +460,7 @@ final class PopoverViewModel: ObservableObject {
     @discardableResult
     func completeSubSyntax() -> Bool {
         guard let hint = subSyntaxHint, let parent = hint.parentMatch else { return false }
-        guard let range = newText.range(of: " :sub ", options: .caseInsensitive) else { return false }
+        guard let range = newText.range(of: " :in ", options: .caseInsensitive) else { return false }
         let prefix = String(newText[..<range.upperBound])
         newText = prefix + parent.text
         return true
