@@ -25,6 +25,7 @@ struct LaterView: View {
                 .padding(.horizontal, 16)
             }
 
+            ScrollViewReader { proxy in
             List(selection: $viewModel.laterSelection) {
                 let rows = viewModel.laterRows
                 if rows.isEmpty {
@@ -111,6 +112,11 @@ struct LaterView: View {
                 return true
             }
             .background(ListFocusBridge(token: $viewModel.laterFocusListToken))
+            .onChange(of: viewModel.laterSelection) { newID in
+                guard let id = newID else { return }
+                proxy.scrollTo(id)
+            }
+            }
 
             Divider()
 

@@ -221,9 +221,11 @@ final class CommitTextView: NSTextView {
         return true  // Consume the drop so NSTextView doesn't insert text
     }
 
-    // Prevent NSTextView's default drop behavior from inserting text
+    // Block drag-and-drop text insertion (handled in performDragOperation).
+    // Paste uses NSPasteboard.general — allow super to insert text normally.
     override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
-        false
+        if pboard.name == .drag { return false }
+        return super.readSelection(from: pboard, type: type)
     }
 
     override func paste(_ sender: Any?) {

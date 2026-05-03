@@ -82,6 +82,7 @@ struct TaskRowView: View {
                 SubtaskProgressPill(
                     subtasks: task.subtasks,
                     isCollapsed: isCollapsed,
+                    isSelected: isSelected,
                     onToggle: { onToggleCollapse?() }
                 )
             }
@@ -141,15 +142,30 @@ struct TaskRowView: View {
 }
 
 /// `▸ n/m` (collapsed) or `▾ n/m` (expanded) indicator shown after a parent's label when it
-/// has subtasks. Clickable to toggle collapse; muted normally, green tint when all done.
+/// has subtasks. Clickable to toggle collapse; muted normally, blue tint when all done.
 struct SubtaskProgressPill: View {
     let subtasks: [Subtask]
     let isCollapsed: Bool
+    var isSelected: Bool = false
     let onToggle: () -> Void
 
     private var done: Int { subtasks.filter(\.isDone).count }
     private var total: Int { subtasks.count }
     private var allDone: Bool { total > 0 && done == total }
+
+    private var foreground: Color {
+        if allDone {
+            return isSelected ? .white : Color.blue.opacity(0.9)
+        }
+        return Color.secondary
+    }
+
+    private var capsuleFill: Color {
+        if allDone {
+            return isSelected ? Color.white.opacity(0.22) : Color.blue.opacity(0.15)
+        }
+        return Color.secondary.opacity(0.12)
+    }
 
     var body: some View {
         HStack(spacing: 3) {
@@ -158,13 +174,10 @@ struct SubtaskProgressPill: View {
             Text("\(done)/\(total)")
                 .font(.system(size: 11, weight: .medium))
         }
-        .foregroundStyle(allDone ? Color.green.opacity(0.9) : Color.secondary)
+        .foregroundStyle(foreground)
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
-        .background(
-            Capsule()
-                .fill(allDone ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
-        )
+        .background(Capsule().fill(capsuleFill))
         .contentShape(Capsule())
         .onTapGesture { onToggle() }
     }

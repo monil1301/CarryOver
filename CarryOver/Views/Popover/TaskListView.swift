@@ -14,20 +14,26 @@ struct TaskListView: View {
     private let rowInsets = EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)
 
     var body: some View {
-        List(selection: $viewModel.selection) {
-            if viewModel.isSearchActive {
-                searchResultsList
-            } else {
-                normalTaskList
+        ScrollViewReader { proxy in
+            List(selection: $viewModel.selection) {
+                if viewModel.isSearchActive {
+                    searchResultsList
+                } else {
+                    normalTaskList
+                }
+            }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 10)
+            .onDeleteCommand {
+                viewModel.deleteSelected()
+            }
+            .background(ListFocusBridge(token: $viewModel.focusListToken))
+            .onChange(of: viewModel.selection) { newID in
+                guard let id = newID else { return }
+                proxy.scrollTo(id)
             }
         }
-        .listStyle(.inset)
-        .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, 10)
-        .onDeleteCommand {
-            viewModel.deleteSelected()
-        }
-        .background(ListFocusBridge(token: $viewModel.focusListToken))
 
         ListReturnKeyBridge(onReturn: {
             guard !viewModel.isEditing else { return false }
