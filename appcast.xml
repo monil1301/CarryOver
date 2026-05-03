@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>CarryOver Updates</title>
+    <link>https://monil1301.github.io/CarryOver/appcast.xml</link>
+    <description>Updates for CarryOver</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.8.0</title>
+      <pubDate>Sun, 03 May 2026 07:34:54 +0000</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/monil1301/CarryOver/releases/download/v1.8.0/CarryOver.app.zip"
+        type="application/octet-stream"
+      />
+    </item>
+  </channel>
+</rss>
