@@ -32,6 +32,10 @@ struct ShortcutsCheatSheetView: View {
                     ("Delete task", ["⌫", "Delete"]),
                     ("Toggle complete", ["Space"]),
                     ("Create subtask", ["<text>", ":sub", "<parent>"]),
+                    ("Indent into subtask", ["Tab"]),
+                    ("Unindent subtask", ["⇧", "Tab"]),
+                    ("Collapse subtasks", ["←"]),
+                    ("Expand subtasks", ["→"]),
                     ("Search", ["⌘", "F"]),
                     ("Move to Later", ["⌘", "⇧", "L"]),
                     ("Move up", ["⌘", "↑"]),
@@ -45,6 +49,8 @@ struct ShortcutsCheatSheetView: View {
                     ("Move to Today", ["⌘", "⏎"]),
                     ("Edit task", ["⏎"]),
                     ("Delete task", ["⌫"]),
+                    ("Collapse subtasks", ["←"]),
+                    ("Expand subtasks", ["→"]),
                     ("Search", ["⌘", "F"]),
                 ])
 
